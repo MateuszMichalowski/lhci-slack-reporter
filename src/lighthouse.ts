@@ -24,7 +24,6 @@ async function runLighthouseForUrl(
     const outputFile = path.join(outputDir, `${encodeURIComponent(url)}-${deviceType}.json`);
     const htmlOutputFile = path.join(outputDir, `${encodeURIComponent(url)}-${deviceType}.html`);
 
-    // Ensure the output directory exists
     if (!fs.existsSync(outputDir)) {
         try {
             fs.mkdirSync(outputDir, { recursive: true });
@@ -37,27 +36,20 @@ async function runLighthouseForUrl(
 
     const categoriesArg = categories.join(',');
 
-    const lhciBin = require.resolve('@lhci/cli/src/cli.js');
-
-    const quotedUrl = `"${url}"`;
-
     const command = [
-        'node',
-        lhciBin,
-        'collect',
-        `--url=${quotedUrl}`,
+        'npx',
+        'lighthouse@latest',
+        url,
         '--output=json',
-        `--outputPath="${outputFile}"`,
+        `--output-path=${outputFile}`,
         deviceType === 'desktop' ? '--preset=desktop' : '',
-        `--onlyCategories="${categoriesArg}"`,
-        `--chromeFlags="${chromeFlags}"`,
-        `--maxWaitForLoad=${timeout * 1000}`,
-        deviceType === 'desktop' ? '--formFactor=desktop' : '--formFactor=mobile',
-        `--screenEmulation.width=${deviceType === 'desktop' ? 1350 : 360}`,
-        `--screenEmulation.height=${deviceType === 'desktop' ? 940 : 640}`,
-        `--screenEmulation.deviceScaleFactor=${deviceType === 'desktop' ? 1 : 2.625}`,
-        `--screenEmulation.mobile=${deviceType === 'desktop' ? 'false' : 'true'}`,
-        `--htmlPath="${htmlOutputFile}"`
+        `--only-categories=${categoriesArg}`,
+        `--chrome-flags="${chromeFlags}"`,
+        `--max-wait-for-load=${timeout * 1000}`,
+        deviceType === 'desktop' ? '--form-factor=desktop' : '--form-factor=mobile',
+        deviceType === 'desktop' ? '--emulated-form-factor=desktop' : '--emulated-form-factor=mobile',
+        `--view`,
+        `--save-assets`
     ].filter(Boolean).join(' ');
 
     core.debug(`Executing command: ${command}`);
@@ -78,15 +70,47 @@ async function runLighthouseForUrl(
                 core.debug(`Command stderr: ${stderr}`);
             }
 
-            if (!fs.existsSync(outputFile)) {
-                throw new Error(`Output file not found: ${outputFile}`);
+            const outputDirFiles = fs.readdirSync(outputDir);
+            const jsonFiles = outputDirFiles.filter(file =>
+                file.includes(encodeURIComponent(url).replace(/%/g, '')) &&
+                file.endsWith('.json')
+            );
+
+            if (jsonFiles.length === 0) {
+                throw new Error(`No JSON output files found in ${outputDir}`);
             }
 
+            jsonFiles.sort((a, b) => {
+                return fs.statSync(path.join(outputDir, b)).mtime.getTime() -
+                    fs.statSync(path.join(outputDir, a)).mtime.getTime();
+            });
+
+            const newestJsonFile = path.join(outputDir, jsonFiles[0]);
+
             try {
-                const rawResults = fs.readFileSync(outputFile, 'utf8');
+                const rawResults = fs.readFileSync(newestJsonFile, 'utf8');
                 core.debug(`Raw results file content (first 200 chars): ${rawResults.substring(0, 200)}...`);
 
                 const results = JSON.parse(rawResults);
+
+                fs.copyFileSync(newestJsonFile, outputFile);
+
+                const htmlFiles = outputDirFiles.filter(file =>
+                    file.includes(encodeURIComponent(url).replace(/%/g, '')) &&
+                    file.endsWith('.html')
+                );
+
+                let reportUrl = '';
+                if (htmlFiles.length > 0) {
+                    htmlFiles.sort((a, b) => {
+                        return fs.statSync(path.join(outputDir, b)).mtime.getTime() -
+                            fs.statSync(path.join(outputDir, a)).mtime.getTime();
+                    });
+
+                    const newestHtmlFile = path.join(outputDir, htmlFiles[0]);
+                    fs.copyFileSync(newestHtmlFile, htmlOutputFile);
+                    reportUrl = path.relative(process.cwd(), htmlOutputFile);
+                }
 
                 if (!results.categories) {
                     throw new Error(`Invalid Lighthouse results: missing 'categories' property`);
@@ -101,8 +125,6 @@ async function runLighthouseForUrl(
                         score: category.score
                     })
                 );
-
-                const reportUrl = path.relative(process.cwd(), htmlOutputFile);
 
                 return {
                     url,
