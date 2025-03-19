@@ -1,0 +1,50 @@
+name: Lighthouse Local Testing (act)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+      
+      # Mock the lighthouse test results to avoid Chrome dependency in local testing
+      - name: Create mock lighthouse results
+        run: |
+          mkdir -p lighthouse-results
+          echo '{
+            "url": "https://example.com",
+            "categories": {
+              "performance": {"score": 0.85, "title": "Performance"},
+              "accessibility": {"score": 0.92, "title": "Accessibility"},
+              "best-practices": {"score": 0.93, "title": "Best Practices"},
+              "seo": {"score": 0.95, "title": "SEO"}
+            }
+          }' > lighthouse-results/example.json
+          
+          # Mock the report URL
+          touch lighthouse-results/example.html
+
+      - name: Run action with mock data
+        env:
+          INPUT_URLS: 'https://example.com'
+          INPUT_DEVICE_TYPES: 'mobile, desktop'
+          INPUT_CATEGORIES: 'performance,accessibility,seo'
+          INPUT_SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          INPUT_SLACK_TITLE: 'Mock Test Results'
+          INPUT_FAIL_ON_SCORE_BELOW: '0'
+          INPUT_CHROME_FLAGS: '--no-sandbox --headless --disable-gpu'
+          INPUT_TIMEOUT: '30'
+        run: node dist/index.js

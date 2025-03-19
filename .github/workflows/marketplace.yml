@@ -1,0 +1,36 @@
+name: Publish to GitHub Marketplace
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # The GitHub Marketplace publication is handled through the GitHub UI
+      # after the release is created. This workflow ensures the build is valid.
+      - name: Verify artifact
+        run: |
+          if [ ! -f "dist/index.js" ]; then
+            echo "::error::dist/index.js not found. Build failed."
+            exit 1
+          fi
+          echo "✅ Build artifacts verified"
