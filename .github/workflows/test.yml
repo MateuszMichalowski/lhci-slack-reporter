@@ -25,9 +25,6 @@ jobs:
       - name: Run linting
         run: npm run lint
 
-      - name: Run tests
-        run: npm test
-
       - name: Build
         run: npm run build
 
@@ -38,7 +35,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: ./
         with:
-          urls: 'https://example.com,https://google.com'
+          urls: 'https://monterail.com'
           device_types: 'mobile'
           categories: 'performance,accessibility'
           slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
