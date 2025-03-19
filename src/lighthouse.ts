@@ -15,7 +15,8 @@ async function runLighthouseForUrl(
     deviceType: string,
     categories: string[],
     chromeFlags: string,
-    timeout: number
+    timeout: number,
+    maxRetries: number = 1
 ): Promise<LighthouseResult> {
     core.info(`Running Lighthouse for URL: ${url}, Device: ${deviceType}`);
 
@@ -23,70 +24,119 @@ async function runLighthouseForUrl(
     const outputFile = path.join(outputDir, `${encodeURIComponent(url)}-${deviceType}.json`);
     const htmlOutputFile = path.join(outputDir, `${encodeURIComponent(url)}-${deviceType}.html`);
 
+    // Ensure the output directory exists
     if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true });
+        try {
+            fs.mkdirSync(outputDir, { recursive: true });
+            core.debug(`Created output directory: ${outputDir}`);
+        } catch (err) {
+            core.error(`Failed to create output directory: ${err}`);
+            throw new Error(`Failed to create output directory: ${err}`);
+        }
     }
 
     const categoriesArg = categories.join(',');
+
+    const lhciBin = require.resolve('@lhci/cli/src/cli.js');
+
+    const quotedUrl = `"${url}"`;
+
     const command = [
-        'npx', '@lhci/cli@latest', 'collect',
-        `--url=${url}`,
-        `--output=json`,
-        `--outputPath=${outputFile}`,
-        `--settings.preset=${deviceType === 'desktop' ? 'desktop' : 'mobile'}`,
-        `--settings.onlyCategories=${categoriesArg}`,
-        `--settings.chromeFlags="${chromeFlags}"`,
-        `--settings.maxWaitForLoad=${timeout * 1000}`,
-        `--settings.extraHeaders="{\\\"x-lighthouse-test\\\":\\\"true\\\"}"`,
-        `--settings.formFactor=${deviceType}`,
-        `--htmlPath=${htmlOutputFile}`
-    ].join(' ');
+        'node',
+        lhciBin,
+        'collect',
+        `--url=${quotedUrl}`,
+        '--output=json',
+        `--outputPath="${outputFile}"`,
+        deviceType === 'desktop' ? '--preset=desktop' : '',
+        `--onlyCategories="${categoriesArg}"`,
+        `--chromeFlags="${chromeFlags}"`,
+        `--maxWaitForLoad=${timeout * 1000}`,
+        deviceType === 'desktop' ? '--formFactor=desktop' : '--formFactor=mobile',
+        `--screenEmulation.width=${deviceType === 'desktop' ? 1350 : 360}`,
+        `--screenEmulation.height=${deviceType === 'desktop' ? 940 : 640}`,
+        `--screenEmulation.deviceScaleFactor=${deviceType === 'desktop' ? 1 : 2.625}`,
+        `--screenEmulation.mobile=${deviceType === 'desktop' ? 'false' : 'true'}`,
+        `--htmlPath="${htmlOutputFile}"`
+    ].filter(Boolean).join(' ');
 
     core.debug(`Executing command: ${command}`);
 
-    try {
-        const { stdout, stderr } = await execPromise(command);
-        core.debug(`stdout: ${stdout}`);
+    let lastError = null;
 
-        if (stderr && !stderr.includes('Storing results')) {
-            core.warning(`stderr: ${stderr}`);
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        if (attempt > 0) {
+            core.warning(`Retry attempt ${attempt}/${maxRetries} for URL: ${url}, Device: ${deviceType}`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
         }
 
-        if (!fs.existsSync(outputFile)) {
-            throw new Error(`Output file not found: ${outputFile}`);
-        }
+        try {
+            const { stdout, stderr } = await execPromise(command);
+            core.debug(`Command stdout: ${stdout}`);
 
-        const rawResults = fs.readFileSync(outputFile, 'utf8');
-        const results = JSON.parse(rawResults);
+            if (stderr) {
+                core.debug(`Command stderr: ${stderr}`);
+            }
 
-        core.info(`Successfully ran Lighthouse for URL: ${url}, Device: ${deviceType}`);
+            if (!fs.existsSync(outputFile)) {
+                throw new Error(`Output file not found: ${outputFile}`);
+            }
 
-        const lighthouseCategories: LighthouseCategory[] = Object.entries(results.categories).map(
-            ([id, category]: [string, any]) => ({
-                id,
-                title: category.title,
-                score: category.score
-            })
-        );
+            try {
+                const rawResults = fs.readFileSync(outputFile, 'utf8');
+                core.debug(`Raw results file content (first 200 chars): ${rawResults.substring(0, 200)}...`);
 
-        const reportUrl = path.relative(process.cwd(), htmlOutputFile);
+                const results = JSON.parse(rawResults);
 
-        return {
-            url,
-            deviceType,
-            categories: lighthouseCategories,
-            reportUrl
-        };
-    } catch (error) {
-        core.error(`Failed to run Lighthouse for URL: ${url}, Device: ${deviceType}`);
-        if (error instanceof Error) {
-            core.error(error.message);
-            if ('stderr' in error) {
-                core.error(`stderr: ${(error as any).stderr}`);
+                if (!results.categories) {
+                    throw new Error(`Invalid Lighthouse results: missing 'categories' property`);
+                }
+
+                core.info(`Successfully ran Lighthouse for URL: ${url}, Device: ${deviceType}`);
+
+                const lighthouseCategories: LighthouseCategory[] = Object.entries(results.categories).map(
+                    ([id, category]: [string, any]) => ({
+                        id,
+                        title: category.title,
+                        score: category.score
+                    })
+                );
+
+                const reportUrl = path.relative(process.cwd(), htmlOutputFile);
+
+                return {
+                    url,
+                    deviceType,
+                    categories: lighthouseCategories,
+                    reportUrl
+                };
+            } catch (parseError) {
+                throw new Error(`Failed to parse Lighthouse results: ${(parseError as Error).message}`);
+            }
+        } catch (error) {
+            lastError = error;
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.warning(`Attempt ${attempt + 1} failed: ${errorMessage}`);
+
+            if (attempt < maxRetries) {
+                continue;
             }
         }
-        throw error;
     }
+
+    core.error(`Failed to run Lighthouse for URL: ${url}, Device: ${deviceType}`);
+    if (lastError) {
+        if (lastError instanceof Error) {
+            core.error(lastError.message);
+            if ('stderr' in lastError) {
+                core.error(`stderr: ${(lastError as any).stderr}`);
+            }
+        } else {
+            core.error(String(lastError));
+        }
+    }
+
+    throw lastError || new Error(`Failed to run Lighthouse for URL: ${url}, Device: ${deviceType}`);
 }
 
 /**
@@ -104,11 +154,13 @@ export async function runLighthouseTests(
 
     core.info(`Starting Lighthouse tests for ${urls.length} URLs on ${deviceTypes.length} device types`);
 
+    const sanitizedChromeFlags = chromeFlags.replace(/"/g, '\\"');
+
     for (const url of urls) {
         for (const deviceType of deviceTypes) {
             try {
                 core.info(`Testing ${url} on ${deviceType}...`);
-                const result = await runLighthouseForUrl(url, deviceType, categories, chromeFlags, timeout);
+                const result = await runLighthouseForUrl(url, deviceType, categories, sanitizedChromeFlags, timeout, 2);
                 results.push(result);
                 core.info(`Completed test for ${url} on ${deviceType}`);
             } catch (error) {
