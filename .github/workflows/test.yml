@@ -36,7 +36,7 @@ jobs:
         uses: ./
         with:
           urls: 'https://monterail.com'
-          device_types: 'mobile'
+          device_types: 'desktop'
           categories: 'performance,accessibility'
           slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
           slack_title: 'Test Results'
