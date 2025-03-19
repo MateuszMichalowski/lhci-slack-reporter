@@ -209,8 +209,7 @@ describe('validateInputs', () => {
     });
 
     it('validates URLs correctly', () => {
-        // Mock valid URLs
-        mockGetInput.mockImplementation((name, options) => {
+        mockGetInput.mockImplementation((name) => {
             if (name === 'urls') return 'https://example.com,https://test.com';
             if (name === 'device_types') return 'mobile,desktop';
             if (name === 'slack_webhook_url') return 'https://hooks.slack.com/services/xxx';
@@ -222,7 +221,7 @@ describe('validateInputs', () => {
     });
 
     it('throws error for empty URLs', () => {
-        mockGetInput.mockImplementation((name, options) => {
+        mockGetInput.mockImplementation((name) => {
             if (name === 'urls') return '';
             return '';
         });
@@ -231,7 +230,7 @@ describe('validateInputs', () => {
     });
 
     it('throws error for invalid URLs', () => {
-        mockGetInput.mockImplementation((name, options) => {
+        mockGetInput.mockImplementation((name) => {
             if (name === 'urls') return 'https://example.com,invalid-url';
             return '';
         });
@@ -240,7 +239,7 @@ describe('validateInputs', () => {
     });
 
     it('throws error for invalid device types', () => {
-        mockGetInput.mockImplementation((name, options) => {
+        mockGetInput.mockImplementation((name) => {
             if (name === 'urls') return 'https://example.com';
             if (name === 'device_types') return 'mobile,tablet'; // 'tablet' is invalid
             return '';
@@ -250,7 +249,7 @@ describe('validateInputs', () => {
     });
 
     it('throws error for invalid fail_on_score_below value', () => {
-        mockGetInput.mockImplementation((name, options) => {
+        mockGetInput.mockImplementation((name) => {
             if (name === 'urls') return 'https://example.com';
             if (name === 'device_types') return 'mobile';
             if (name === 'fail_on_score_below') return '101'; // invalid value (> 100)
@@ -262,7 +261,7 @@ describe('validateInputs', () => {
     });
 
     it('throws error for invalid timeout value', () => {
-        mockGetInput.mockImplementation((name, options) => {
+        mockGetInput.mockImplementation((name) => {
             if (name === 'urls') return 'https://example.com';
             if (name === 'device_types') return 'mobile';
             if (name === 'timeout') return '-10'; // invalid negative value
@@ -274,7 +273,7 @@ describe('validateInputs', () => {
     });
 
     it('throws error when neither slack_webhook_url nor slack_token is provided', () => {
-        mockGetInput.mockImplementation((name, options) => {
+        mockGetInput.mockImplementation((name) => {
             if (name === 'urls') return 'https://example.com';
             if (name === 'device_types') return 'mobile';
             // Both slack_webhook_url and slack_token are empty
@@ -285,7 +284,7 @@ describe('validateInputs', () => {
     });
 
     it('accepts valid configuration with webhook URL', () => {
-        mockGetInput.mockImplementation((name, options) => {
+        mockGetInput.mockImplementation((name) => {
             if (name === 'urls') return 'https://example.com';
             if (name === 'device_types') return 'mobile';
             if (name === 'fail_on_score_below') return '70';
@@ -298,7 +297,7 @@ describe('validateInputs', () => {
     });
 
     it('accepts valid configuration with slack token', () => {
-        mockGetInput.mockImplementation((name, options) => {
+        mockGetInput.mockImplementation((name) => {
             if (name === 'urls') return 'https://example.com';
             if (name === 'device_types') return 'mobile';
             if (name === 'fail_on_score_below') return '70';
