@@ -37,8 +37,6 @@ interface DividerBlock {
 
 type SlackBlock = SectionBlock | HeaderBlock | DividerBlock | ContextBlock;
 
-type CategoryName = 'performance' | 'seo' | 'best-practices' | 'accessibility';
-
 interface CategoryData {
     title: string;
     icon: string;
