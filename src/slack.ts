@@ -96,11 +96,12 @@ function formatScoreRow(
     mobileScores: Record<string, number>,
     desktopScores: Record<string, number>,
     hasMobile: boolean,
-    hasDesktop: boolean
+    hasDesktop: boolean,
+    urlText: string
 ): string {
     if (categories.length === 0) return "```| No data available |```";
 
-    let row = "```|";
+    let row = "```" + urlText + "\n|";
 
     categories.forEach(category => {
         const mobileScore = mobileScores[category] || 0;
@@ -256,14 +257,6 @@ function createSlackBlocks(
 
         const urlText = deviceSection.length > 0 ? `${url} - ${deviceSection}` : url;
 
-        const urlBlock: SectionBlock = {
-            type: 'section',
-            text: {
-                type: 'mrkdwn',
-                text: urlText
-            }
-        };
-
         const scoresBlock: SectionBlock = {
             type: 'section',
             text: {
@@ -273,12 +266,13 @@ function createSlackBlocks(
                     data.mobileScores,
                     data.desktopScores,
                     hasMobileTests,
-                    hasDesktopTests
+                    hasDesktopTests,
+                    urlText
                 )
             }
         };
 
-        const blocksSize = JSON.stringify([urlBlock, scoresBlock]).length;
+        const blocksSize = JSON.stringify([scoresBlock]).length;
         if (currentMessageLength + blocksSize > SLACK_MESSAGE_CHAR_LIMIT) {
             const warningBlock: ContextBlock = {
                 type: 'context',
@@ -291,7 +285,6 @@ function createSlackBlocks(
             break;
         }
 
-        blocks.push(urlBlock);
         blocks.push(scoresBlock);
         currentMessageLength += blocksSize;
     }
