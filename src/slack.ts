@@ -99,13 +99,194 @@ function formatTableRow(columns: string[], widths: number[]): string {
 }
 
 /**
- * Create a Slack message for the Lighthouse results with a horizontal, 4-column layout
+ * Create a compact Slack message for the Lighthouse results with desktop/mobile scores side by side
  */
-function createSlackBlocks(
+function createCompactSlackBlocks(
     results: FormattedLighthouseResults,
     title: string
 ): Array<SlackBlock> {
-    core.debug('Creating enhanced Slack message blocks with horizontal layout');
+    core.debug('Creating compact Slack message blocks with table layout');
+
+    const blocks: SlackBlock[] = [
+        {
+            type: 'header',
+            text: {
+                type: 'plain_text',
+                text: title,
+                emoji: true
+            }
+        },
+        {
+            type: 'section',
+            text: {
+                type: 'mrkdwn',
+                text: `*Summary:* Tested ${results.summary.totalUrls} URLs on desktop and mobile devices`
+            }
+        }
+    ];
+
+    const resultsByUrl = new Map<string, Map<string, Map<string, number>>>();
+
+    const allCategories = new Set<string>();
+
+    results.results.forEach(result => {
+        result.categories.forEach(category => {
+            allCategories.add(category.id);
+        });
+
+        if (!resultsByUrl.has(result.url)) {
+            resultsByUrl.set(result.url, new Map<string, Map<string, number>>());
+        }
+
+        const urlData = resultsByUrl.get(result.url)!;
+
+        result.categories.forEach(category => {
+            if (!urlData.has(category.id)) {
+                urlData.set(category.id, new Map<string, number>());
+            }
+            urlData.get(category.id)!.set(result.deviceType, category.score);
+        });
+    });
+
+    const sortedCategories = Array.from(allCategories).sort();
+
+    const tableHeader = ['URL'];
+    sortedCategories.forEach(category => {
+        const categoryName = category.charAt(0).toUpperCase() + category.slice(1);
+        tableHeader.push(categoryName);
+    });
+
+    blocks.push({
+        type: 'section',
+        text: {
+            type: 'mrkdwn',
+            text: '*Lighthouse Scores (Desktop / Mobile)*'
+        }
+    });
+
+    let tableText = '```';
+
+    tableText += 'URL'.padEnd(20);
+    sortedCategories.forEach(category => {
+        const categoryName = category.charAt(0).toUpperCase() + category.slice(1);
+        tableText += '| ' + categoryName.padEnd(16);
+    });
+    tableText += '\n';
+
+    tableText += '─'.repeat(20);
+    sortedCategories.forEach(() => {
+        tableText += '|' + '─'.repeat(17);
+    });
+    tableText += '\n';
+
+    resultsByUrl.forEach((urlData, url) => {
+        const displayUrl = url.replace(/^https?:\/\//, '').substring(0, 18).padEnd(20);
+        tableText += displayUrl;
+
+        sortedCategories.forEach(category => {
+            const categoryScores = urlData.get(category) || new Map<string, number>();
+            const desktopScore = categoryScores.get('desktop') !== undefined
+                ? Math.round(categoryScores.get('desktop')! * 100)
+                : '-';
+            const mobileScore = categoryScores.get('mobile') !== undefined
+                ? Math.round(categoryScores.get('mobile')! * 100)
+                : '-';
+
+            const scoreDisplay = `${desktopScore} / ${mobileScore}`;
+            tableText += '| ' + scoreDisplay.padEnd(16);
+        });
+
+        tableText += '\n';
+    });
+
+    tableText += '```';
+
+    blocks.push({
+        type: 'section',
+        text: {
+            type: 'mrkdwn',
+            text: tableText
+        }
+    });
+
+    blocks.push({
+        type: 'context',
+        elements: [
+            {
+                type: 'mrkdwn',
+                text: 'Score Legend: 90-100: Excellent | 50-89: Needs Improvement | 0-49: Poor'
+            }
+        ]
+    });
+
+    if (results.summary.averageScores && Object.keys(results.summary.averageScores).length > 0) {
+        let bestCategory = '';
+        let bestScore = 0;
+        let worstCategory = '';
+        let worstScore = 1;
+
+        for (const [category, score] of Object.entries(results.summary.averageScores)) {
+            if (score > bestScore) {
+                bestScore = score;
+                bestCategory = category;
+            }
+            if (score < worstScore) {
+                worstScore = score;
+                worstCategory = category;
+            }
+        }
+
+        if (bestCategory && worstCategory) {
+            blocks.push({
+                type: 'section',
+                text: {
+                    type: 'mrkdwn',
+                    text: '*Key Insights:*'
+                }
+            });
+
+            blocks.push({
+                type: 'section',
+                text: {
+                    type: 'mrkdwn',
+                    text: `• *Strongest Area:* ${bestCategory.charAt(0).toUpperCase() + bestCategory.slice(1)} at ${formatScore(bestScore)}\n• *Area for Improvement:* ${worstCategory.charAt(0).toUpperCase() + worstCategory.slice(1)} at ${formatScore(worstScore)}`
+                }
+            });
+        }
+    }
+
+    blocks.push({
+        type: 'context',
+        elements: [
+            {
+                type: 'mrkdwn',
+                text: 'Detailed HTML reports available in GitHub Actions artifacts'
+            }
+        ]
+    });
+
+    blocks.push({
+        type: 'context',
+        elements: [
+            {
+                type: 'mrkdwn',
+                text: `Generated by Lighthouse CI Slack Reporter · ${new Date().toISOString()}`
+            }
+        ]
+    });
+
+    return blocks;
+}
+
+/**
+ * Create a Slack message for the Lighthouse results with a horizontal, 4-column layout
+ * This is the original detailed format - kept for reference and fallback
+ */
+function createDetailedSlackBlocks(
+    results: FormattedLighthouseResults,
+    title: string
+): Array<SlackBlock> {
+    core.debug('Creating detailed Slack message blocks with horizontal layout');
 
     const resultsByUrl: Record<string, any[]> = {};
 
@@ -280,7 +461,7 @@ function createSlackBlocks(
                     elements: [
                         {
                             type: 'mrkdwn',
-                            text: `📋 HTML report generated (not accessible via Slack, but saved as an artifact)`
+                            text: `📋 HTML report generated (available in GitHub Actions artifacts)`
                         }
                     ]
                 });
@@ -395,6 +576,13 @@ async function sendViaWebhook(
             message.channel = channel;
         }
 
+        const messageSize = JSON.stringify(message).length;
+        core.debug(`Slack webhook message size: ${messageSize} characters`);
+
+        if (messageSize > 3500) {
+            core.warning(`Slack message is large (${messageSize} characters), might be truncated by Slack`);
+        }
+
         const timeoutPromise = new Promise<never>((_, reject) => {
             setTimeout(() => reject(new Error(`Slack webhook request timed out after ${timeoutMs}ms`)), timeoutMs);
         });
@@ -428,6 +616,13 @@ async function sendViaApi(
     try {
         const client = new WebClient(token);
 
+        const messageSize = JSON.stringify({ blocks }).length;
+        core.debug(`Slack API message size: ${messageSize} characters`);
+
+        if (messageSize > 3500) {
+            core.warning(`Slack message is large (${messageSize} characters), might be truncated by Slack`);
+        }
+
         const result = await client.chat.postMessage({
             channel: channel || '#general',
             text: title || 'Lighthouse Test Results',
@@ -455,10 +650,20 @@ export async function sendSlackReport(
     const webhookUrl = core.getInput('slack_webhook_url');
     const slackToken = core.getInput('slack_token');
     const channel = core.getInput('slack_channel');
+    const useCompactFormat = core.getInput('slack_compact_format') !== 'false'; // Default to true
 
     core.info('Preparing to send report to Slack');
 
-    const blocks = createSlackBlocks(results, title);
+    let blocks: SlackBlock[];
+    if (useCompactFormat) {
+        blocks = createCompactSlackBlocks(results, title);
+        core.debug('Using compact table format for Slack message');
+    } else {
+        blocks = createDetailedSlackBlocks(results, title);
+        core.debug('Using detailed format for Slack message');
+    }
+
+    core.debug(`Slack message size: ${JSON.stringify(blocks).length} characters`);
 
     if (webhookUrl) {
         await sendViaWebhook(webhookUrl, blocks, channel);
