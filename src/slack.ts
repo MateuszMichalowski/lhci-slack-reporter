@@ -280,7 +280,7 @@ function createSlackBlocks(
                     elements: [
                         {
                             type: 'mrkdwn',
-                            text: `📋 <file://${result.reportUrl}|View Detailed Report>`
+                            text: `📋 HTML report generated (not accessible via Slack, but saved as an artifact)`
                         }
                     ]
                 });

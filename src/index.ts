@@ -1,8 +1,11 @@
+import * as glob from 'glob';
 import * as core from '@actions/core';
 import { runLighthouseTests } from './lighthouse';
 import { sendSlackReport } from './slack';
 import { parseInputArray, formatLighthouseResults, validateInputs } from './utils';
 import * as fs from 'fs';
+import * as path from 'path';
+import { DefaultArtifactClient } from "@actions/artifact";
 
 async function run(): Promise<void> {
     try {
@@ -71,6 +74,39 @@ async function run(): Promise<void> {
         core.info('📤 Sending results to Slack...');
         await sendSlackReport(formattedResults, slackTitle);
         core.info('✅ Results sent to Slack successfully');
+
+        try {
+            if (process.env.GITHUB_ACTIONS === 'true') {
+                core.info('📤 Uploading Lighthouse reports as artifacts...');
+
+                const artifactClient = new DefaultArtifactClient()
+                const artifactName = 'lighthouse-reports';
+                const reportDir = path.resolve(process.cwd(), 'lighthouse-results');
+
+                if (fs.existsSync(reportDir)) {
+                    const files = glob.sync(`${reportDir}/**/*.{html,json}`);
+
+                    if (files.length > 0) {
+                        const rootDirectory = process.cwd();
+                        await artifactClient.uploadArtifact(
+                            artifactName,
+                            files,
+                            rootDirectory,
+                            { retentionDays: 10 }
+                        );
+                        core.info(`✅ Uploaded ${files.length} Lighthouse reports as artifacts`);
+                    } else {
+                        core.warning('No report files found to upload as artifacts');
+                    }
+                } else {
+                    core.warning(`Report directory does not exist: ${reportDir}`);
+                }
+            }
+        } catch (error) {
+            // Don't fail the whole action if artifact upload fails
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.warning(`Failed to upload artifacts: ${errorMessage}`);
+        }
 
         const allScores = lighthouseResults.flatMap(result =>
             result.categories.map(category => category.score)
