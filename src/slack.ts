@@ -16,7 +16,7 @@ interface MrkdwnElement {
 
 interface SectionBlock {
     type: 'section';
-    text?: TextObject;
+    text?: TextObject | MrkdwnElement;
     fields?: TextObject[];
     accessory?: any;
 }
@@ -37,65 +37,112 @@ interface DividerBlock {
 
 type SlackBlock = SectionBlock | HeaderBlock | DividerBlock | ContextBlock;
 
-/**
- * Get emoji for a Lighthouse score using Unicode emoji
- */
+type CategoryName = 'performance' | 'seo' | 'best-practices' | 'accessibility';
+
+interface CategoryData {
+    title: string;
+    icon: string;
+}
+
 function getScoreEmoji(score: number): string {
     if (score >= 0.9) return '🟢';
     if (score >= 0.5) return '🟡';
     return '🔴';
 }
 
-/**
- * Create a visual bar to represent score
- */
-function createScoreBar(score: number): string {
-    const fullBlocks = Math.floor(score * 10);
-    const barChars = '█░';
+function formatPercentage(score: number): string {
+    return `${Math.round(score * 100)}%`;
+}
 
-    let bar = '';
-    for (let i = 0; i < 10; i++) {
-        bar += i < fullBlocks ? barChars[0] : barChars[1];
+const categoryConfig: Record<string, CategoryData> = {
+    'performance': { title: 'Performance', icon: '⚡️' },
+    'accessibility': { title: 'Accessibility', icon: '♿️' },
+    'best-practices': { title: 'Best Practices', icon: '🙌' },
+    'bestpractices': { title: 'Best Practices', icon: '🙌' },
+    'seo': { title: 'SEO', icon: '🔍' }
+};
+
+function getCategoryConfig(categoryName: string): CategoryData {
+    const normalized = getNormalizedCategoryName(categoryName);
+    return categoryConfig[normalized] || {
+        title: categoryName.charAt(0).toUpperCase() + categoryName.slice(1),
+        icon: '📊'
+    };
+}
+
+function getNormalizedCategoryName(name: string): string {
+    if (!name) return 'unknown';
+
+    name = name.toLowerCase().trim();
+
+    if (name === 'bestpractices' || name === 'best practices') {
+        return 'best-practices';
     }
 
-    return bar;
+    return name;
 }
 
-/**
- * Get a description for a score
- */
-function getScoreDescription(score: number): string {
-    if (score >= 0.9) return 'Excellent';
-    if (score >= 0.7) return 'Good';
-    if (score >= 0.5) return 'Needs Improvement';
-    return 'Poor';
+function generateCategoryHeaders(categories: string[]): string {
+    if (categories.length === 0) return "```| No categories tested |```";
+
+    let header = "```|";
+    categories.forEach(category => {
+        const icon = getCategoryConfig(category).icon;
+        header += `       ${icon}       |`;
+    });
+    return header + "```";
 }
 
-/**
- * Pad a string to ensure consistent column widths
- */
-function padColumn(text: string, width: number): string {
-    if (text.length >= width) return text;
-    return text + ' '.repeat(width - text.length);
-}
+function formatScoreRow(
+    categories: string[],
+    mobileScores: Record<string, number>,
+    desktopScores: Record<string, number>,
+    hasMobile: boolean,
+    hasDesktop: boolean
+): string {
+    if (categories.length === 0) return "```| No data available |```";
 
-/**
- * Format a table row with consistent column widths
- */
-function formatTableRow(columns: string[], widths: number[]): string {
-    let result = '';
+    let row = "```|";
 
-    for (let i = 0; i < columns.length; i++) {
-        const paddedColumn = padColumn(columns[i], widths[i]);
+    categories.forEach(category => {
+        const mobileScore = mobileScores[category] || 0;
+        const desktopScore = desktopScores[category] || 0;
 
-        if (i < columns.length - 1) {
-            result += paddedColumn + ' | ';
+        let scoreText;
+        if (hasMobile && hasDesktop) {
+            scoreText = `  ${formatPercentage(mobileScore).padEnd(5)} / ${formatPercentage(desktopScore).padEnd(5)}  `;
+        } else if (hasMobile) {
+            scoreText = `     ${formatPercentage(mobileScore).padEnd(5)}      `;
+        } else if (hasDesktop) {
+            scoreText = `     ${formatPercentage(desktopScore).padEnd(5)}      `;
         } else {
-            result += paddedColumn;
+            scoreText = "       N/A        ";
         }
+
+        row += scoreText + "|";
+    });
+
+    return row + "```";
+}
+
+function generateLegend(categories: string[], hasMobile: boolean, hasDesktop: boolean): string {
+    let legend = "Legend: ";
+
+    const categoryLegends = categories.map(cat => {
+        const config = getCategoryConfig(cat);
+        return `${config.icon} - ${config.title.toLowerCase()}`;
+    });
+    legend += categoryLegends.join(", ");
+
+    if (hasMobile && hasDesktop) {
+        legend += " • Format: Mobile/Desktop scores";
+    } else if (hasMobile) {
+        legend += " • Showing Mobile scores";
+    } else if (hasDesktop) {
+        legend += " • Showing Desktop scores";
     }
 
-    return result;
+    return legend;
 }
 
 /**
@@ -105,18 +152,7 @@ function createSlackBlocks(
     results: FormattedLighthouseResults,
     title: string
 ): Array<SlackBlock> {
-    core.debug('Creating enhanced Slack message blocks with horizontal layout');
-
-    const resultsByUrl: Record<string, any[]> = {};
-
-    const COLUMN_WIDTHS = [18, 12, 15, 20];
-
-    results.results.forEach(result => {
-        if (!resultsByUrl[result.url]) {
-            resultsByUrl[result.url] = [];
-        }
-        resultsByUrl[result.url].push(result);
-    });
+    core.debug('Creating dynamic Slack message blocks');
 
     const blocks: SlackBlock[] = [
         {
@@ -133,164 +169,141 @@ function createSlackBlocks(
                 type: 'mrkdwn',
                 text: `*Summary:* Tested ${results.summary.totalUrls} URLs with ${results.summary.totalTests} tests`
             }
+        },
+        {
+            type: 'divider'
         }
     ];
 
-    blocks.push({
+    const urlResults: Record<string, {
+        mobileScores: Record<string, number>;
+        desktopScores: Record<string, number>;
+    }> = {};
+
+    const allCategories = new Set<string>();
+    let hasMobileTests = false;
+    let hasDesktopTests = false;
+
+    results.results.forEach(result => {
+        const url = result.url;
+
+        if (!urlResults[url]) {
+            urlResults[url] = {
+                mobileScores: {},
+                desktopScores: {}
+            };
+        }
+
+        result.categories.forEach(category => {
+            const rawCategoryName = category.title.toLowerCase();
+            const categoryName = getNormalizedCategoryName(rawCategoryName);
+
+            allCategories.add(categoryName);
+
+            if (result.deviceType === 'mobile') {
+                hasMobileTests = true;
+                urlResults[url].mobileScores[categoryName] = category.score;
+            } else {
+                hasDesktopTests = true;
+                urlResults[url].desktopScores[categoryName] = category.score;
+            }
+        });
+    });
+
+    const sortedCategories = Array.from(allCategories).sort((a, b) => {
+        const order = ['performance', 'seo', 'accessibility', 'best-practices'];
+        return order.indexOf(a) - order.indexOf(b);
+    });
+
+    const legendBlock: SectionBlock = {
         type: 'section',
         text: {
             type: 'mrkdwn',
-            text: '*Average Scores Across All Tests:*'
+            text: generateLegend(sortedCategories, hasMobileTests, hasDesktopTests)
         }
-    });
+    };
+    blocks.push(legendBlock);
 
-    const headerTexts = ['*Category*', '*Score*', '*Visual*', '*Status*'];
-    blocks.push({
+    const headerBlock: SectionBlock = {
         type: 'section',
         text: {
             type: 'mrkdwn',
-            text: '```' + formatTableRow(headerTexts, COLUMN_WIDTHS) + '```'
+            text: generateCategoryHeaders(sortedCategories)
         }
-    });
+    };
+    blocks.push(headerBlock);
 
-    for (const [category, score] of Object.entries(results.summary.averageScores)) {
-        const categoryName = category.charAt(0).toUpperCase() + category.slice(1);
-        const emoji = getScoreEmoji(score);
-        const percentage = Math.round(score * 100);
-        const scoreText = `${emoji} ${percentage}%`;
-        const bar = createScoreBar(score);
-        const description = getScoreDescription(score);
+    const SLACK_MESSAGE_CHAR_LIMIT = 3000;
+    let currentMessageLength = JSON.stringify(blocks).length;
 
-        const rowTexts = [categoryName, scoreText, bar, description];
+    for (const [url, data] of Object.entries(urlResults)) {
+        let deviceSection = "";
 
-        blocks.push({
+        if (hasMobileTests && Object.keys(data.mobileScores).length > 0) {
+            const mobileAvgScore = Object.values(data.mobileScores).reduce((sum, score) => sum + score, 0) /
+                (Object.values(data.mobileScores).length || 1);
+            const mobileEmoji = getScoreEmoji(mobileAvgScore);
+            deviceSection += `📱 ${mobileEmoji}`;
+        }
+
+        if (hasDesktopTests && Object.keys(data.desktopScores).length > 0) {
+            if (deviceSection.length > 0) {
+                deviceSection += "   |   ";
+            }
+            const desktopAvgScore = Object.values(data.desktopScores).reduce((sum, score) => sum + score, 0) /
+                (Object.values(data.desktopScores).length || 1);
+            const desktopEmoji = getScoreEmoji(desktopAvgScore);
+            deviceSection += `💻 ${desktopEmoji}`;
+        }
+
+        const urlText = deviceSection.length > 0 ? `${url} - ${deviceSection}` : url;
+
+        const urlBlock: SectionBlock = {
             type: 'section',
             text: {
                 type: 'mrkdwn',
-                text: '```' + formatTableRow(rowTexts, COLUMN_WIDTHS) + '```'
+                text: urlText
             }
-        });
-    }
+        };
 
-    const deviceTypes = Object.keys(results.summary.scoresByDevice);
-    if (deviceTypes.length > 1) {
-        for (const deviceType of deviceTypes) {
-            const deviceIcon = deviceType === 'mobile' ? '📱' : '💻';
-
-            blocks.push({
-                type: 'section',
-                text: {
-                    type: 'mrkdwn',
-                    text: `*Average Scores for ${deviceIcon} ${deviceType.charAt(0).toUpperCase() + deviceType.slice(1)}:*`
-                }
-            });
-
-            blocks.push({
-                type: 'section',
-                text: {
-                    type: 'mrkdwn',
-                    text: '```' + formatTableRow(headerTexts, COLUMN_WIDTHS) + '```'
-                }
-            });
-
-            const deviceScores = results.summary.scoresByDevice[deviceType];
-
-            for (const [category, score] of Object.entries(deviceScores)) {
-                const categoryName = category.charAt(0).toUpperCase() + category.slice(1);
-                const emoji = getScoreEmoji(score);
-                const percentage = Math.round(score * 100);
-                const scoreText = `${emoji} ${percentage}%`;
-                const bar = createScoreBar(score);
-                const description = getScoreDescription(score);
-
-                const rowTexts = [categoryName, scoreText, bar, description];
-
-                blocks.push({
-                    type: 'section',
-                    text: {
-                        type: 'mrkdwn',
-                        text: '```' + formatTableRow(rowTexts, COLUMN_WIDTHS) + '```'
-                    }
-                });
-            }
-        }
-    }
-
-    blocks.push({
-        type: 'context',
-        elements: [
-            {
-                type: 'mrkdwn',
-                text: 'Score Legend: 🟢 Good (90-100) · 🟡 Needs Improvement (50-89) · 🔴 Poor (0-49)'
-            }
-        ]
-    });
-
-    blocks.push({ type: 'divider' });
-
-    for (const [url, urlResults] of Object.entries(resultsByUrl)) {
-        blocks.push({
+        const scoresBlock: SectionBlock = {
             type: 'section',
             text: {
                 type: 'mrkdwn',
-                text: `*URL:* <${url}|${url.replace(/^https?:\/\//, '')}>`
+                text: formatScoreRow(
+                    sortedCategories,
+                    data.mobileScores,
+                    data.desktopScores,
+                    hasMobileTests,
+                    hasDesktopTests
+                )
             }
-        });
+        };
 
-        for (const result of urlResults) {
-            const deviceIcon = result.deviceType === 'mobile' ? '📱' : '💻';
-
-            blocks.push({
-                type: 'section',
-                text: {
+        const blocksSize = JSON.stringify([urlBlock, scoresBlock]).length;
+        if (currentMessageLength + blocksSize > SLACK_MESSAGE_CHAR_LIMIT) {
+            const warningBlock: ContextBlock = {
+                type: 'context',
+                elements: [{
                     type: 'mrkdwn',
-                    text: `*Device:* ${deviceIcon} ${result.deviceType.charAt(0).toUpperCase() + result.deviceType.slice(1)}`
-                }
-            });
-
-            blocks.push({
-                type: 'section',
-                text: {
-                    type: 'mrkdwn',
-                    text: '```' + formatTableRow(headerTexts, COLUMN_WIDTHS) + '```'
-                }
-            });
-
-            for (const category of result.categories) {
-                const emoji = getScoreEmoji(category.score);
-                const percentage = Math.round(category.score * 100);
-                const scoreText = `${emoji} ${percentage}%`;
-                const bar = createScoreBar(category.score);
-                const description = getScoreDescription(category.score);
-
-                const rowTexts = [category.title, scoreText, bar, description];
-
-                blocks.push({
-                    type: 'section',
-                    text: {
-                        type: 'mrkdwn',
-                        text: '```' + formatTableRow(rowTexts, COLUMN_WIDTHS) + '```'
-                    }
-                });
-            }
-
-            if (result.reportUrl) {
-                blocks.push({
-                    type: 'context',
-                    elements: [
-                        {
-                            type: 'mrkdwn',
-                            text: `📋 HTML report generated (not accessible via Slack, but saved as an artifact)`
-                        }
-                    ]
-                });
-            }
+                    text: '⚠️ Some results were omitted due to Slack message size limitations'
+                }]
+            };
+            blocks.push(warningBlock);
+            break;
         }
 
-        blocks.push({ type: 'divider' });
+        blocks.push(urlBlock);
+        blocks.push(scoresBlock);
+        currentMessageLength += blocksSize;
     }
 
     if (Object.keys(results.summary.averageScores).length > 0) {
+        const dividerBlock: DividerBlock = {
+            type: 'divider'
+        };
+        blocks.push(dividerBlock);
+
         let bestCategory = '';
         let bestScore = 0;
         let worstCategory = '';
@@ -307,63 +320,33 @@ function createSlackBlocks(
             }
         }
 
-        const mobileScores = results.summary.scoresByDevice['mobile'];
-        const desktopScores = results.summary.scoresByDevice['desktop'];
-        let deviceComparisonInsight = '';
-
-        if (mobileScores && desktopScores) {
-            let biggestDiffCategory = '';
-            let biggestDiff = 0;
-
-            for (const category of Object.keys(mobileScores)) {
-                if (desktopScores[category]) {
-                    const diff = Math.abs(mobileScores[category] - desktopScores[category]);
-                    if (diff > biggestDiff) {
-                        biggestDiff = diff;
-                        biggestDiffCategory = category;
-                    }
-                }
-            }
-
-            if (biggestDiffCategory) {
-                const mobileScore = mobileScores[biggestDiffCategory];
-                const desktopScore = desktopScores[biggestDiffCategory];
-                const betterDevice = mobileScore > desktopScore ? 'Mobile' : 'Desktop';
-                const percentageDiff = Math.round(biggestDiff * 100);
-
-                deviceComparisonInsight = `• *Biggest device difference:* ${biggestDiffCategory.charAt(0).toUpperCase() + biggestDiffCategory.slice(1)} performs ${percentageDiff}% better on ${betterDevice}`;
-            }
-        }
-
         if (bestCategory && worstCategory) {
-            blocks.push({
+            const insightHeaderBlock: SectionBlock = {
                 type: 'section',
                 text: {
                     type: 'mrkdwn',
                     text: '*Key Insights:*'
                 }
-            });
+            };
+            blocks.push(insightHeaderBlock);
 
             const insights = [
                 `• *Strongest Area:* ${bestCategory.charAt(0).toUpperCase() + bestCategory.slice(1)} at ${formatScore(bestScore)}`,
                 `• *Area for Improvement:* ${worstCategory.charAt(0).toUpperCase() + worstCategory.slice(1)} at ${formatScore(worstScore)}`
             ];
 
-            if (deviceComparisonInsight) {
-                insights.push(deviceComparisonInsight);
-            }
-
-            blocks.push({
+            const insightsBlock: SectionBlock = {
                 type: 'section',
                 text: {
                     type: 'mrkdwn',
                     text: insights.join('\n')
                 }
-            });
+            };
+            blocks.push(insightsBlock);
         }
     }
 
-    blocks.push({
+    const footerBlock: ContextBlock = {
         type: 'context',
         elements: [
             {
@@ -371,7 +354,8 @@ function createSlackBlocks(
                 text: `Generated by Lighthouse CI Slack Reporter · ${new Date().toISOString()}`
             }
         ]
-    });
+    };
+    blocks.push(footerBlock);
 
     return blocks;
 }
