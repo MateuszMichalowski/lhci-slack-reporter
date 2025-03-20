@@ -109,11 +109,11 @@ function formatScoreRow(
 
         let scoreText;
         if (hasMobile && hasDesktop) {
-            scoreText = `  ${formatPercentage(mobileScore).padEnd(5)} / ${formatPercentage(desktopScore).padEnd(5)}  `;
+            scoreText = `  ${formatPercentage(mobileScore).padStart(5)} / ${formatPercentage(desktopScore).padEnd(5)}  `;
         } else if (hasMobile) {
-            scoreText = `     ${formatPercentage(mobileScore).padEnd(5)}      `;
+            scoreText = `     ${formatPercentage(mobileScore).padStart(5).padEnd(5)}      `;
         } else if (hasDesktop) {
-            scoreText = `     ${formatPercentage(desktopScore).padEnd(5)}      `;
+            scoreText = `     ${formatPercentage(desktopScore).padStart(5).padEnd(5)}      `;
         } else {
             scoreText = "       N/A        ";
         }
@@ -247,7 +247,7 @@ function createSlackBlocks(
 
         if (hasDesktopTests && Object.keys(data.desktopScores).length > 0) {
             if (deviceSection.length > 0) {
-                deviceSection += "   |   ";
+                deviceSection += "   •   ";
             }
             const desktopAvgScore = Object.values(data.desktopScores).reduce((sum, score) => sum + score, 0) /
                 (Object.values(data.desktopScores).length || 1);
