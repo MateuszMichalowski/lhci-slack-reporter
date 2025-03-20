@@ -35,6 +35,6 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: ./
         with:
-          urls: 'https://monterail.com/,https://monterail.com/services/,https://monterail.com/projects/,https://monterail.com/contact/,https://monterail.com/blog/'
+          urls: 'https://monterail.com/services/'
           slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
           slack_title: 'Test Results'
