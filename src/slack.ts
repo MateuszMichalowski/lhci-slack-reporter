@@ -111,7 +111,7 @@ function formatScoreRow(
         const desktopFormatted = formatPercentage(desktopScore)
         let scoreText;
         if (hasMobile && hasDesktop) {
-            scoreText = `${mobileFormatted.padStart(9)} / ${desktopFormatted.padEnd(17)}`;
+            scoreText = `${mobileFormatted.padStart(6)} / ${desktopFormatted.padEnd(8)}`;
         } else if (hasMobile) {
             scoreText = `${mobileFormatted.padStart(9).padEnd(17)}`;
         } else if (hasDesktop) {
