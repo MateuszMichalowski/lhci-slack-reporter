@@ -86,7 +86,7 @@ function generateCategoryHeaders(categories: string[]): string {
     let header = "```|";
     categories.forEach(category => {
         const icon = getCategoryConfig(category).icon;
-        header += `       ${icon}       |`;
+        header += `       ${icon}        |`;
     });
     return header + "```";
 }
@@ -106,14 +106,16 @@ function formatScoreRow(
     categories.forEach(category => {
         const mobileScore = mobileScores[category] || 0;
         const desktopScore = desktopScores[category] || 0;
-
+        
+        const mobileFormatted = formatPercentage(mobileScore)
+        const desktopFormatted = formatPercentage(desktopScore)
         let scoreText;
         if (hasMobile && hasDesktop) {
-            scoreText = `  ${formatPercentage(mobileScore).padStart(5)} / ${formatPercentage(desktopScore).padEnd(5)}  `;
+            scoreText = `${mobileFormatted.padStart(9)} / ${desktopFormatted.padEnd(17)}`;
         } else if (hasMobile) {
-            scoreText = `     ${formatPercentage(mobileScore).padStart(5).padEnd(5)}      `;
+            scoreText = `${mobileFormatted.padStart(9).padEnd(17)}`;
         } else if (hasDesktop) {
-            scoreText = `     ${formatPercentage(desktopScore).padStart(5).padEnd(5)}      `;
+            scoreText = `${desktopFormatted.padStart(9).padEnd(17)}`;
         } else {
             scoreText = "       N/A        ";
         }
