@@ -35,6 +35,11 @@ interface DividerBlock {
     type: 'divider';
 }
 
+interface SummaryColumnSlot {
+    mobileScoreEmoji: string | null;
+    desktopScoreEmoji: string | null;
+}
+
 type SlackBlock = SectionBlock | HeaderBlock | DividerBlock | ContextBlock;
 
 interface CategoryData {
@@ -42,12 +47,18 @@ interface CategoryData {
     icon: string;
 }
 
+/**
+ * Get emoji for a Lighthouse score using Unicode emoji
+ */
 function getScoreEmoji(score: number): string {
     if (score >= 0.9) return '🟢';
     if (score >= 0.5) return '🟡';
     return '🔴';
 }
 
+/**
+ * Format a number as percentage
+ */
 function formatPercentage(score: number): string {
     return `${Math.round(score * 100)}%`;
 }
@@ -57,9 +68,13 @@ const categoryConfig: Record<string, CategoryData> = {
     'accessibility': { title: 'Accessibility', icon: '♿️' },
     'best-practices': { title: 'Best Practices', icon: '🙌' },
     'bestpractices': { title: 'Best Practices', icon: '🙌' },
-    'seo': { title: 'SEO', icon: '🔍' }
+    'seo': { title: 'SEO', icon: '🔍' },
+    'pwa': { title: 'PWA', icon: '📱' }
 };
 
+/**
+ * Get configuration for a category
+ */
 function getCategoryConfig(categoryName: string): CategoryData {
     const normalized = getNormalizedCategoryName(categoryName);
     return categoryConfig[normalized] || {
@@ -68,6 +83,9 @@ function getCategoryConfig(categoryName: string): CategoryData {
     };
 }
 
+/**
+ * Normalize category name for consistent handling
+ */
 function getNormalizedCategoryName(name: string): string {
     if (!name) return 'unknown';
 
@@ -80,80 +98,134 @@ function getNormalizedCategoryName(name: string): string {
     return name;
 }
 
-function generateCategoryHeaders(categories: string[]): string {
+/**
+ * Generate table header for categories
+ * Uses fixed-width columns for better alignment
+ */
+function generateCategoryHeaders(categories: string[], hasMobileTests = false, hasDesktopTests = false): string {
     if (categories.length === 0) return "```| No categories tested |```";
 
-    let header = "```|";
+    const COLUMN_WIDTH = 13;
+    const DEVICE_COLUMN_WIDTH = 5;
+
+    let header = "```| ";
+
     categories.forEach(category => {
-        const icon = getCategoryConfig(category).icon;
-        header += `       ${icon}        |`;
+        const config = getCategoryConfig(category);
+        const icon = config.icon;
+        const paddingSize = Math.floor((COLUMN_WIDTH - icon.length) / 2);
+        const leftPad = " ".repeat(paddingSize);
+        const rightPad = " ".repeat(COLUMN_WIDTH - icon.length - paddingSize);
+        header += `${leftPad}${icon}${rightPad}|`;
     });
+
+    let deviceSummary = "";
+    if (hasMobileTests) {
+        deviceSummary += "📱";
+    }
+    if (hasDesktopTests) {
+        if (deviceSummary.length) deviceSummary += " ";
+        deviceSummary += "💻";
+    }
+
+    const devicePaddingSize = Math.floor((DEVICE_COLUMN_WIDTH - deviceSummary.length) / 2);
+    header += ` ${" ".repeat(devicePaddingSize)}${deviceSummary}${" ".repeat(Math.max(0, DEVICE_COLUMN_WIDTH - deviceSummary.length - devicePaddingSize))}`;
+
     return header + "```";
 }
 
+/**
+ * Create row for score data with consistent column widths
+ */
 function formatScoreRow(
     categories: string[],
     mobileScores: Record<string, number>,
     desktopScores: Record<string, number>,
     hasMobile: boolean,
     hasDesktop: boolean,
-    urlText: string
+    urlText: string,
+    summaryColumn: SummaryColumnSlot
 ): string {
     if (categories.length === 0) return "```| No data available |```";
+
+    const COLUMN_WIDTH = 13;
+    const DEVICE_COLUMN_WIDTH = 5;
 
     let row = "```|";
 
     categories.forEach(category => {
         const mobileScore = mobileScores[category] || 0;
         const desktopScore = desktopScores[category] || 0;
-        
-        const mobileFormatted = formatPercentage(mobileScore)
-        const desktopFormatted = formatPercentage(desktopScore)
+
         let scoreText;
+
         if (hasMobile && hasDesktop) {
-            scoreText = `${mobileFormatted.padStart(6)} / ${desktopFormatted.padEnd(8)}`;
+            const mobileFormatted = formatPercentage(mobileScore);
+            const desktopFormatted = formatPercentage(desktopScore);
+            scoreText = `${mobileFormatted}/${desktopFormatted}`;
         } else if (hasMobile) {
-            scoreText = `${mobileFormatted.padStart(9).padEnd(17)}`;
+            scoreText = formatPercentage(mobileScore);
         } else if (hasDesktop) {
-            scoreText = `${desktopFormatted.padStart(9).padEnd(17)}`;
+            scoreText = formatPercentage(desktopScore);
         } else {
-            scoreText = "       N/A        ";
+            scoreText = "N/A";
         }
 
-        row += scoreText + "|";
+        const paddingSize = Math.floor((COLUMN_WIDTH - scoreText.length) / 2);
+        const leftPad = " ".repeat(paddingSize);
+        const rightPad = " ".repeat(COLUMN_WIDTH - scoreText.length - paddingSize);
+
+        row += `${leftPad}${scoreText}${rightPad}|`;
     });
 
-    return row + `\n${urlText}` + "```";
+    let summaryText = "";
+    if (summaryColumn.mobileScoreEmoji) {
+        summaryText += summaryColumn.mobileScoreEmoji;
+    }
+    if (summaryColumn.desktopScoreEmoji) {
+        if (summaryText.length) {
+            summaryText += "/";
+        }
+        summaryText += summaryColumn.desktopScoreEmoji;
+    }
+
+    const summaryPaddingSize = Math.floor((DEVICE_COLUMN_WIDTH - summaryText.length) / 2);
+    row += ` ${" ".repeat(summaryPaddingSize)}${summaryText}${" ".repeat(Math.max(0, DEVICE_COLUMN_WIDTH - summaryText.length - summaryPaddingSize))}`;
+
+    return row + "\n" + urlText + "```";
 }
 
+/**
+ * Generate legend explanation for the table
+ */
 function generateLegend(categories: string[], hasMobile: boolean, hasDesktop: boolean): string {
     let legend = "Legend: ";
 
     const categoryLegends = categories.map(cat => {
         const config = getCategoryConfig(cat);
-        return ` ${config.icon}  -  ${config.title}`;
+        return `${config.icon} - ${config.title}`;
     });
-    legend += categoryLegends.join(", ");
+    legend += categoryLegends.join(" • ");
 
     if (hasMobile && hasDesktop) {
-        legend += "\n • Format: Mobile/Desktop scores";
+        legend += "\n📊 Format: Mobile/Desktop scores";
     } else if (hasMobile) {
-        legend += "\n • Showing Mobile scores";
+        legend += "\n📊 Showing Mobile scores";
     } else if (hasDesktop) {
-        legend += "\n • Showing Desktop scores";
+        legend += "\n📊 Showing Desktop scores";
     }
 
     return legend;
 }
 
 /**
- * Create a Slack message for the Lighthouse results with a horizontal, 4-column layout
+ * Create a Slack message for the Lighthouse results with a consistent tabular layout
  */
 function createSlackBlocks(
     results: FormattedLighthouseResults,
     title: string
 ): Array<SlackBlock> {
-    core.debug('Creating dynamic Slack message blocks');
+    core.debug('Creating enhanced Slack message blocks with tabular layout');
 
     const blocks: SlackBlock[] = [
         {
@@ -196,7 +268,7 @@ function createSlackBlocks(
         }
 
         result.categories.forEach(category => {
-            const rawCategoryName = category.title.toLowerCase();
+            const rawCategoryName = category.id || category.title.toLowerCase();
             const categoryName = getNormalizedCategoryName(rawCategoryName);
 
             allCategories.add(categoryName);
@@ -229,7 +301,7 @@ function createSlackBlocks(
         type: 'section',
         text: {
             type: 'mrkdwn',
-            text: generateCategoryHeaders(sortedCategories)
+            text: generateCategoryHeaders(sortedCategories, hasMobileTests, hasDesktopTests)
         }
     };
     blocks.push(headerBlock);
@@ -240,24 +312,29 @@ function createSlackBlocks(
     for (const [url, data] of Object.entries(urlResults)) {
         let deviceSection = "";
 
+        const summaryColumn: SummaryColumnSlot = { mobileScoreEmoji: null, desktopScoreEmoji: null };
+
         if (hasMobileTests && Object.keys(data.mobileScores).length > 0) {
             const mobileAvgScore = Object.values(data.mobileScores).reduce((sum, score) => sum + score, 0) /
                 (Object.values(data.mobileScores).length || 1);
-            const mobileEmoji = getScoreEmoji(mobileAvgScore);
-            deviceSection += `📱 ${mobileEmoji}`;
+            summaryColumn.mobileScoreEmoji = getScoreEmoji(mobileAvgScore);
         }
 
         if (hasDesktopTests && Object.keys(data.desktopScores).length > 0) {
-            if (deviceSection.length > 0) {
-                deviceSection += "   •   ";
-            }
             const desktopAvgScore = Object.values(data.desktopScores).reduce((sum, score) => sum + score, 0) /
                 (Object.values(data.desktopScores).length || 1);
-            const desktopEmoji = getScoreEmoji(desktopAvgScore);
-            deviceSection += `💻 ${desktopEmoji}`;
+            summaryColumn.desktopScoreEmoji = getScoreEmoji(desktopAvgScore);
         }
 
-        const urlText = deviceSection.length > 0 ? `${url} - ${deviceSection}` : url;
+        if (hasMobileTests && hasDesktopTests) {
+            deviceSection = "📱 Mobile & 💻 Desktop";
+        } else if (hasMobileTests) {
+            deviceSection = "📱 Mobile";
+        } else if (hasDesktopTests) {
+            deviceSection = "💻 Desktop";
+        }
+
+        const urlText = `${url}`;
 
         const scoresBlock: SectionBlock = {
             type: 'section',
@@ -269,7 +346,8 @@ function createSlackBlocks(
                     data.desktopScores,
                     hasMobileTests,
                     hasDesktopTests,
-                    urlText
+                    urlText,
+                    summaryColumn
                 )
             }
         };
@@ -292,10 +370,9 @@ function createSlackBlocks(
     }
 
     if (Object.keys(results.summary.averageScores).length > 0) {
-        const dividerBlock: DividerBlock = {
+        blocks.push({
             type: 'divider'
-        };
-        blocks.push(dividerBlock);
+        });
 
         let bestCategory = '';
         let bestScore = 0;
@@ -314,28 +391,50 @@ function createSlackBlocks(
         }
 
         if (bestCategory && worstCategory) {
-            const insightHeaderBlock: SectionBlock = {
+            blocks.push({
                 type: 'section',
                 text: {
                     type: 'mrkdwn',
                     text: '*Key Insights:*'
                 }
-            };
-            blocks.push(insightHeaderBlock);
+            });
 
             const insights = [
-                `• *Strongest Area:* ${bestCategory.charAt(0).toUpperCase() + bestCategory.slice(1)} at ${formatScore(bestScore)}`,
-                `• *Area for Improvement:* ${worstCategory.charAt(0).toUpperCase() + worstCategory.slice(1)} at ${formatScore(worstScore)}`
+                `• *Strongest Area:* ${getCategoryConfig(bestCategory).title} at ${formatScore(bestScore)}`,
+                `• *Area for Improvement:* ${getCategoryConfig(worstCategory).title} at ${formatScore(worstScore)}`
             ];
 
-            const insightsBlock: SectionBlock = {
+            if (hasMobileTests && hasDesktopTests) {
+                let biggestGapCategory = '';
+                let biggestGap = 0;
+                let mobileScore = 0;
+                let desktopScore = 0;
+
+                for (const [category, mobileAvg] of Object.entries(results.summary.scoresByDevice['mobile'] || {})) {
+                    const desktopAvg = results.summary.scoresByDevice['desktop']?.[category] || 0;
+                    const gap = Math.abs(mobileAvg - desktopAvg);
+
+                    if (gap > biggestGap) {
+                        biggestGap = gap;
+                        biggestGapCategory = category;
+                        mobileScore = mobileAvg;
+                        desktopScore = desktopAvg;
+                    }
+                }
+
+                if (biggestGapCategory && biggestGap > 0.1) {
+                    const betterDevice = mobileScore > desktopScore ? 'Mobile' : 'Desktop';
+                    insights.push(`• *Device Gap:* ${getCategoryConfig(biggestGapCategory).title} is ${Math.round(biggestGap * 100)}% better on ${betterDevice}`);
+                }
+            }
+
+            blocks.push({
                 type: 'section',
                 text: {
                     type: 'mrkdwn',
                     text: insights.join('\n')
                 }
-            };
-            blocks.push(insightsBlock);
+            });
         }
     }
 
@@ -348,7 +447,7 @@ function createSlackBlocks(
         footerText.push(`<https://github.com/${repoUrl}/actions/runs/${runId}|Download full report from GitHub>`);
     }
 
-    const footerBlock: ContextBlock = {
+    blocks.push({
         type: 'context',
         elements: [
             {
@@ -356,8 +455,7 @@ function createSlackBlocks(
                 text: footerText.join(' · ')
             }
         ]
-    };
-    blocks.push(footerBlock);
+    });
 
     return blocks;
 }
@@ -395,6 +493,13 @@ async function sendViaWebhook(
         core.error('Failed to send report to Slack via webhook');
         if (error instanceof Error) {
             core.error(error.message);
+            if (error.message.includes('429')) {
+                core.error('Rate limit exceeded. Try again later or reduce request frequency.');
+            } else if (error.message.includes('404')) {
+                core.error('Webhook URL not found. Please verify the webhook URL is correct.');
+            } else if (error.message.includes('timeout')) {
+                core.error('Request timed out. Check your network or Slack server status.');
+            }
         }
         throw error;
     }
@@ -407,12 +512,20 @@ async function sendViaApi(
     token: string,
     blocks: SlackBlock[],
     channel?: string,
-    title?: string
+    title?: string,
+    timeoutMs: number = 10000
 ): Promise<void> {
     core.debug(`Sending report to Slack API`);
 
     try {
-        const client = new WebClient(token);
+        const client = new WebClient(token, {
+            timeout: timeoutMs,
+            retryConfig: {
+                retries: 2,
+                factor: 2,
+                minTimeout: 1000
+            }
+        });
 
         const result = await client.chat.postMessage({
             channel: channel || '#general',
@@ -426,6 +539,11 @@ async function sendViaApi(
         core.error('Failed to send report to Slack via API');
         if (error instanceof Error) {
             core.error(error.message);
+            if (error.message.includes('invalid_auth') || error.message.includes('not_authed')) {
+                core.error('Invalid Slack token. Please check your token permissions and validity.');
+            } else if (error.message.includes('channel_not_found')) {
+                core.error(`Channel '${channel || '#general'}' not found. Please verify the channel exists and the bot has access to it.`);
+            }
         }
         throw error;
     }
@@ -441,15 +559,16 @@ export async function sendSlackReport(
     const webhookUrl = core.getInput('slack_webhook_url');
     const slackToken = core.getInput('slack_token');
     const channel = core.getInput('slack_channel');
+    const timeoutMs = parseInt(core.getInput('slack_timeout_ms') || '10000');
 
     core.info('Preparing to send report to Slack');
 
     const blocks = createSlackBlocks(results, title);
 
     if (webhookUrl) {
-        await sendViaWebhook(webhookUrl, blocks, channel);
+        await sendViaWebhook(webhookUrl, blocks, channel, timeoutMs);
     } else if (slackToken) {
-        await sendViaApi(slackToken, blocks, channel, title);
+        await sendViaApi(slackToken, blocks, channel, title, timeoutMs);
     } else {
         throw new Error('Either slack_webhook_url or slack_token must be provided');
     }
