@@ -101,7 +101,7 @@ function formatScoreRow(
 ): string {
     if (categories.length === 0) return "```| No data available |```";
 
-    let row = "```" + urlText + "\n|";
+    let row = "```|";
 
     categories.forEach(category => {
         const mobileScore = mobileScores[category] || 0;
@@ -123,7 +123,7 @@ function formatScoreRow(
         row += scoreText + "|";
     });
 
-    return row + "```";
+    return row + `\n${urlText}` + "```";
 }
 
 function generateLegend(categories: string[], hasMobile: boolean, hasDesktop: boolean): string {
@@ -131,16 +131,16 @@ function generateLegend(categories: string[], hasMobile: boolean, hasDesktop: bo
 
     const categoryLegends = categories.map(cat => {
         const config = getCategoryConfig(cat);
-        return `${config.icon} - ${config.title.toLowerCase()}`;
+        return ` ${config.icon}  -  ${config.title}`;
     });
     legend += categoryLegends.join(", ");
 
     if (hasMobile && hasDesktop) {
-        legend += " • Format: Mobile/Desktop scores";
+        legend += "\n • Format: Mobile/Desktop scores";
     } else if (hasMobile) {
-        legend += " • Showing Mobile scores";
+        legend += "\n • Showing Mobile scores";
     } else if (hasDesktop) {
-        legend += " • Showing Desktop scores";
+        legend += "\n • Showing Desktop scores";
     }
 
     return legend;
