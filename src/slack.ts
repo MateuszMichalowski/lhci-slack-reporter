@@ -310,8 +310,6 @@ function createSlackBlocks(
     let currentMessageLength = JSON.stringify(blocks).length;
 
     for (const [url, data] of Object.entries(urlResults)) {
-        let deviceSection = "";
-
         const summaryColumn: SummaryColumnSlot = { mobileScoreEmoji: null, desktopScoreEmoji: null };
 
         if (hasMobileTests && Object.keys(data.mobileScores).length > 0) {
@@ -324,14 +322,6 @@ function createSlackBlocks(
             const desktopAvgScore = Object.values(data.desktopScores).reduce((sum, score) => sum + score, 0) /
                 (Object.values(data.desktopScores).length || 1);
             summaryColumn.desktopScoreEmoji = getScoreEmoji(desktopAvgScore);
-        }
-
-        if (hasMobileTests && hasDesktopTests) {
-            deviceSection = "📱 Mobile & 💻 Desktop";
-        } else if (hasMobileTests) {
-            deviceSection = "📱 Mobile";
-        } else if (hasDesktopTests) {
-            deviceSection = "💻 Desktop";
         }
 
         const urlText = `${url}`;
