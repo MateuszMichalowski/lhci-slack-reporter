@@ -89,3 +89,11 @@ runs:
         INPUT_CHROME_FLAGS: ${{ inputs.chrome_flags }}
         INPUT_TIMEOUT: ${{ inputs.timeout }}
         INPUT_SLACK_TIMEOUT_MS: ${{ inputs.slack_timeout_ms }}
+
+    - name: Upload Lighthouse reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: lighthouse-reports
+        path: lighthouse-results/**/*.{html,json}
+        if-no-files-found: warn
+        retention-days: 10

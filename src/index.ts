@@ -5,7 +5,6 @@ import { sendSlackReport } from './slack';
 import { parseInputArray, formatLighthouseResults, validateInputs } from './utils';
 import * as fs from 'fs';
 import * as path from 'path';
-import { DefaultArtifactClient } from "@actions/artifact";
 
 async function run(): Promise<void> {
     try {
@@ -99,35 +98,20 @@ async function run(): Promise<void> {
         }
 
         try {
-            if (process.env.GITHUB_ACTIONS === 'true') {
-                core.info('📤 Uploading Lighthouse reports as artifacts...');
-
-                const artifactClient = new DefaultArtifactClient()
-                const artifactName = 'lighthouse-reports';
-                const reportDir = path.resolve(process.cwd(), 'lighthouse-results');
-
-                if (fs.existsSync(reportDir)) {
-                    const files = glob.sync(`${reportDir}/**/*.{html,json}`);
-
-                    if (files.length > 0) {
-                        const rootDirectory = process.cwd();
-                        await artifactClient.uploadArtifact(
-                            artifactName,
-                            files,
-                            rootDirectory,
-                            { retentionDays: 10 }
-                        );
-                        core.info(`✅ Uploaded ${files.length} Lighthouse reports as artifacts`);
-                    } else {
-                        core.warning('No report files found to upload as artifacts');
-                    }
+            const reportDir = path.resolve(process.cwd(), 'lighthouse-results');
+            if (fs.existsSync(reportDir)) {
+                const files = glob.sync(`${reportDir}/**/*.{html,json}`);
+                if (files.length > 0) {
+                    core.info(`📁 Generated ${files.length} Lighthouse reports in ${reportDir}`);
                 } else {
-                    core.warning(`Report directory does not exist: ${reportDir}`);
+                    core.warning('No report files were generated');
                 }
+            } else {
+                core.warning(`Report directory does not exist: ${reportDir}`);
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            core.warning(`⚠️ Failed to upload artifacts: ${errorMessage}`);
+            core.warning(`⚠️ Issue with report handling: ${errorMessage}`);
         }
 
         const allScores = lighthouseResults.flatMap(result =>
