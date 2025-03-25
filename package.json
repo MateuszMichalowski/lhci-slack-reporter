@@ -1,6 +1,6 @@
 {
-  "name": "lighthouse-slack-action",
-  "version": "1.0.0",
+  "name": "lhci-slack-reporter",
+  "version": "1.0.3",
   "description": "GitHub Action to run Lighthouse tests and report to Slack",
   "main": "dist/index.js",
   "scripts": {
@@ -11,7 +11,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/lighthouse-slack-action.git"
+    "url": "git+https://github.com/MateuszMichalowski/lhci-slack-reporter.git"
   },
   "keywords": [
     "github",

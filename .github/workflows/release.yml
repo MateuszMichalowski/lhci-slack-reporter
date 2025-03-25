@@ -46,11 +46,11 @@ jobs:
             ## Installation
             
             ```yaml
-            - uses: MateuszMichalowski/lighthouse-slack-action@${{ github.ref_name }}
+            - uses: MateuszMichalowski/lhci-slack-reporter@${{ github.ref_name }}
             ```
             
             ## Documentation
-            For full documentation, see the [README](https://github.com/MateuszMichalowski/lighthouse-slack-action/blob/main/README.md)
+            For full documentation, see the [README](https://github.com/MateuszMichalowski/lhci-slack-reporter/blob/main/README.md)
           files: |
             dist/index.js
             LICENSE

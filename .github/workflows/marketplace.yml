@@ -22,8 +22,6 @@ jobs:
       - name: Run lint and build
         run: npm run all
 
-      # The GitHub Marketplace publication is handled through the GitHub UI
-      # after the release is created. This workflow ensures the build is valid.
       - name: Verify artifact
         run: |
           if [ ! -f "dist/index.js" ]; then

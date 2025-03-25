@@ -1,8 +1,8 @@
 # Lighthouse CI Slack Reporter
 
-![GitHub Actions Status](https://img.shields.io/github/actions/workflow/status/MateuszMichalowski/lighthouse-slack-action/test.yml?branch=main)
+![GitHub Actions Status](https://img.shields.io/github/actions/workflow/status/MateuszMichalowski/lhci-slack-reporter/test.yml?branch=main)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Dependabot Status](https://img.shields.io/badge/Dependabot-enabled-brightgreen.svg)](https://github.com/MateuszMichalowski/lighthouse-slack-action/blob/main/.github/dependabot.yml)
+[![Dependabot Status](https://img.shields.io/badge/Dependabot-enabled-brightgreen.svg)](https://github.com/MateuszMichalowski/lhci-slack-reporter/blob/main/.github/dependabot.yml)
 
 A powerful GitHub Action that runs Lighthouse tests on specified URLs and reports the results to Slack in a beautifully formatted, tabular layout. Monitor web performance, accessibility, SEO, and best practices directly in your Slack channels.
 
@@ -41,7 +41,7 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Lighthouse CI Slack Reporter
-        uses: MateuszMichalowski/lighthouse-slack-action@v1
+        uses: MateuszMichalowski/lhci-slack-reporter@v1
         with:
           urls: 'https://example.com,https://example.com/blog'
           slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -82,7 +82,7 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Lighthouse CI Slack Reporter
-        uses: MateuszMichalowski/lighthouse-slack-action@v1
+        uses: MateuszMichalowski/lhci-slack-reporter@v1
         with:
           # Test multiple URLs
           urls: >
@@ -137,7 +137,7 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Lighthouse CI Slack Reporter
-        uses: MateuszMichalowski/lighthouse-slack-action@v1
+        uses: MateuszMichalowski/lhci-slack-reporter@v1
         with:
           urls: 'https://staging.example.com'
           slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -163,7 +163,7 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Lighthouse CI Slack Reporter
-        uses: MateuszMichalowski/lighthouse-slack-action@v1
+        uses: MateuszMichalowski/lhci-slack-reporter@v1
         with:
           urls: 'https://example.com,https://example.com/products,https://example.com/blog'
           device_types: 'mobile,desktop'
