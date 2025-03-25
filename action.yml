@@ -90,10 +90,50 @@ runs:
         INPUT_TIMEOUT: ${{ inputs.timeout }}
         INPUT_SLACK_TIMEOUT_MS: ${{ inputs.slack_timeout_ms }}
 
+    - name: Check for Lighthouse reports
+      run: |
+        echo "Looking for Lighthouse reports..."
+        
+        echo "Files in the current directory:"
+        ls -la
+        
+        if [ -d "lighthouse-results" ]; then
+          find lighthouse-results -type f | grep -v "node_modules" | sort
+        else
+          echo "lighthouse-results directory doesn't exist in the current location"
+        fi
+        
+        echo "Checking GitHub workspace for reports:"
+        if [ -d "$GITHUB_WORKSPACE/lighthouse-results" ]; then
+          find $GITHUB_WORKSPACE/lighthouse-results -type f | sort
+          echo "Found reports in $GITHUB_WORKSPACE/lighthouse-results"
+        else
+          echo "No lighthouse-results directory in $GITHUB_WORKSPACE"
+        fi
+      shell: bash
+
+    - name: Copy reports to accessible location
+      run: |
+        mkdir -p $GITHUB_WORKSPACE/lhci-reports
+        
+        if [ -d "lighthouse-results" ]; then
+          echo "Copying from ./lighthouse-results"
+          cp -r lighthouse-results/* $GITHUB_WORKSPACE/lhci-reports/ 2>/dev/null || true
+        fi
+        
+        if [ -d "$GITHUB_WORKSPACE/lighthouse-results" ]; then
+          echo "Copying from $GITHUB_WORKSPACE/lighthouse-results"
+          cp -r $GITHUB_WORKSPACE/lighthouse-results/* $GITHUB_WORKSPACE/lhci-reports/ 2>/dev/null || true
+        fi
+        
+        echo "Files copied to lhci-reports:"
+        find $GITHUB_WORKSPACE/lhci-reports -type f | sort
+      shell: bash
+
     - name: Upload Lighthouse reports
       uses: actions/upload-artifact@v4
       with:
         name: lighthouse-reports
-        path: lighthouse-results/**/*.{html,json}
+        path: ${{ github.workspace }}/lhci-reports/
         if-no-files-found: warn
         retention-days: 10

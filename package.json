@@ -1,6 +1,6 @@
 {
   "name": "lhci-slack-reporter",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "GitHub Action to run Lighthouse tests and report to Slack",
   "main": "dist/index.js",
   "scripts": {
