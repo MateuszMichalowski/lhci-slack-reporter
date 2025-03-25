@@ -2,11 +2,11 @@
 
 ![GitHub Actions Status](https://img.shields.io/github/actions/workflow/status/MateuszMichalowski/lighthouse-slack-action/test.yml?branch=main)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CodeQL](https://github.com/MateuszMichalowski/lighthouse-slack-action/actions/workflows/codeql.yml/badge.svg)](https://github.com/MateuszMichalowski/lighthouse-slack-action/actions/workflows/codeql.yml)
+[![Dependabot Status](https://img.shields.io/badge/Dependabot-enabled-brightgreen.svg)](https://github.com/MateuszMichalowski/lighthouse-slack-action/blob/main/.github/dependabot.yml)
 
 A powerful GitHub Action that runs Lighthouse tests on specified URLs and reports the results to Slack in a beautifully formatted, tabular layout. Monitor web performance, accessibility, SEO, and best practices directly in your Slack channels.
 
-<div align="center">
+<div>
   <img src=".github/assets/preview.png" alt="Slack Report Preview" width="700">
 </div>
 
