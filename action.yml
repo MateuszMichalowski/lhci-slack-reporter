@@ -1,6 +1,6 @@
 name: 'Lighthouse CI Slack Reporter'
 description: 'Run Lighthouse tests on URLs and report results to Slack in tabular format'
-author: 'Your GitHub Username'
+author: 'MateuszMichalowski'
 branding:
   icon: 'bar-chart-2'
   color: 'blue'
@@ -18,13 +18,13 @@ inputs:
     required: false
     default: 'performance,accessibility,best-practices,seo'
   slack_webhook_url:
-    description: 'Slack Webhook URL to send reports to'
-    required: true
+    description: 'Slack Webhook URL to send reports to (required if slack_token is not provided)'
+    required: false
   slack_channel:
     description: 'Slack channel to send the report to (without #)'
     required: false
   slack_token:
-    description: 'Slack API token (used instead of webhook URL if provided)'
+    description: 'Slack API token (required if slack_webhook_url is not provided)'
     required: false
   slack_title:
     description: 'Title for the Slack message'
@@ -35,14 +35,18 @@ inputs:
     required: false
     default: '0'
   chrome_flags:
-    description: 'Custom Chrome flags'
+    description: 'Custom Chrome flags for Lighthouse'
     required: false
     default: '--no-sandbox --headless --disable-gpu'
   timeout:
     description: 'Timeout for each test in seconds'
     required: false
     default: '60'
+  slack_timeout_ms:
+    description: 'Timeout for Slack API requests in milliseconds'
+    required: false
+    default: '10000'
 
 runs:
-  using: 'node16'
+  using: 'node20'
   main: 'dist/index.js'

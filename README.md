@@ -1,24 +1,28 @@
 # Lighthouse CI Slack Reporter
 
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/yourusername/lighthouse-slack-action/test.yml?branch=main)
+![GitHub Actions Status](https://img.shields.io/github/actions/workflow/status/MateuszMichalowski/lighthouse-slack-action/test.yml?branch=main)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CodeQL](https://github.com/MateuszMichalowski/lighthouse-slack-action/actions/workflows/codeql.yml/badge.svg)](https://github.com/MateuszMichalowski/lighthouse-slack-action/actions/workflows/codeql.yml)
 
-A GitHub Action that runs Lighthouse tests on specified URLs and reports the results to a Slack channel in a elegant, formatted table.
+A powerful GitHub Action that runs Lighthouse tests on specified URLs and reports the results to Slack in a beautifully formatted, tabular layout. Monitor web performance, accessibility, SEO, and best practices directly in your Slack channels.
 
-![Slack Message Preview](https://via.placeholder.com/600x400?text=Slack+Message+Preview)
+<div align="center">
+  <img src=".github/assets/preview.png" alt="Slack Report Preview" width="700">
+</div>
 
 ## 🚀 Features
 
-- Run Lighthouse tests on multiple URLs
-- Device types selection (mobile, desktop)
-- Categories to test (performance, accessibility, best-practices, SEO)
-- Send formatted, color-coded reports to Slack with scores for each test
-- Set a minimum score threshold for action failure
-- Compatible with the `act` tool for local testing
+- **Multiple URL Testing**: Test single or multiple URLs in one run
+- **Device Support**: Run tests for mobile, desktop, or both
+- **Full Category Coverage**: Test performance, accessibility, best practices, SEO
+- **Beautiful Slack Reports**: Clean, tabular reports with visual indicators
+- **Flexible Configuration**: Choose between Slack webhooks or API tokens
+- **Score Thresholds**: Set pass/fail criteria based on minimum scores
+- **Artifacts**: HTML reports automatically saved as workflow artifacts
+- **Customizable**: Options for timeouts, Chrome flags, and retry logic
+- **Reliability**: Error handling with retries for flaky tests
 
-## 📋 Usage
-
-### Basic Example
+## 📋 Quick Start
 
 ```yaml
 name: Lighthouse CI
@@ -26,8 +30,9 @@ name: Lighthouse CI
 on:
   push:
     branches: [ main ]
+  # Run weekly on Mondays
   schedule:
-    - cron: '0 0 * * 1'  # Run weekly on Mondays
+    - cron: '0 0 * * 1'
 
 jobs:
   lighthouse:
@@ -36,20 +41,39 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Lighthouse CI Slack Reporter
-        uses: yourusername/lighthouse-slack-action@v1
+        uses: MateuszMichalowski/lighthouse-slack-action@v1
         with:
           urls: 'https://example.com,https://example.com/blog'
           slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
 ```
 
-### All Options
+## 🔧 Configuration Options
+
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `urls` | Comma-separated list of URLs to test | ✅ | - |
+| `device_types` | Device types to test (mobile, desktop) | ❌ | `mobile,desktop` |
+| `categories` | Categories to test (performance, accessibility, best-practices, seo) | ❌ | All categories |
+| `slack_webhook_url` | Slack Webhook URL | ✅* | - |
+| `slack_token` | Slack API token (alternative to webhook) | ✅* | - |
+| `slack_channel` | Slack channel for the report | ❌ | Default from webhook |
+| `slack_title` | Title for the Slack message | ❌ | `Lighthouse Test Results` |
+| `fail_on_score_below` | Fail action if any score is below this threshold (0-100) | ❌ | `0` |
+| `chrome_flags` | Custom Chrome flags | ❌ | `--no-sandbox --headless --disable-gpu` |
+| `timeout` | Timeout for each test in seconds | ❌ | `60` |
+| `slack_timeout_ms` | Timeout for Slack API calls in milliseconds | ❌ | `10000` |
+
+*Either `slack_webhook_url` or `slack_token` is required
+
+## 📊 Complete Example
 
 ```yaml
 name: Lighthouse CI
 
 on:
-  push:
-    branches: [ main ]
+  schedule:
+    - cron: '0 9 * * 1-5'  # Weekdays at 9 AM
+  workflow_dispatch:  # Allow manual triggering
 
 jobs:
   lighthouse:
@@ -58,140 +82,174 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Lighthouse CI Slack Reporter
-        uses: yourusername/lighthouse-slack-action@v1
+        uses: MateuszMichalowski/lighthouse-slack-action@v1
         with:
-          # Required: URLs to test (comma-separated)
-          urls: 'https://example.com,https://example.com/blog'
+          # Test multiple URLs
+          urls: >
+            https://example.com,
+            https://example.com/about,
+            https://example.com/contact,
+            https://example.com/blog
           
-          # Optional: Device types to test (default: mobile,desktop)
+          # Test both mobile and desktop
           device_types: 'mobile,desktop'
           
-          # Optional: Test categories to run (default: performance,accessibility,best-practices,seo)
+          # Only test these categories
           categories: 'performance,accessibility,best-practices,seo'
           
-          # Required: Either slack_webhook_url or slack_token must be provided
+          # Use Slack webhook (alternatively use slack_token)
           slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
           
-          # Optional: Slack API token (alternative to webhook)
-          # slack_token: ${{ secrets.SLACK_TOKEN }}
-          
-          # Optional: Slack channel to send the report to (without #)
+          # Specify channel (optional if using webhook)
           slack_channel: 'lighthouse-reports'
           
-          # Optional: Title for the Slack message (default: 'Lighthouse Test Results')
-          slack_title: 'Lighthouse Test Results - Production'
+          # Custom title
+          slack_title: 'Weekly Lighthouse Results'
           
-          # Optional: Fail the action if any score is below this threshold (0-100) (default: 0)
+          # Fail if any score is below 70
           fail_on_score_below: '70'
           
-          # Optional: Custom Chrome flags (default: --no-sandbox --headless --disable-gpu)
-          chrome_flags: '--no-sandbox --headless --disable-gpu'
+          # Custom Chrome flags
+          chrome_flags: '--no-sandbox --headless --disable-gpu --disable-dev-shm-usage'
           
-          # Optional: Timeout for each test in seconds (default: 60)
-          timeout: '60'
+          # Test timeout
+          timeout: '90'
 ```
 
-## ⚙️ Inputs
+## 💡 Common Use Cases
 
-| Name | Description | Required | Default |
-|------|-------------|----------|---------|
-| `urls` | Comma-separated list of URLs to test | Yes | N/A |
-| `device_types` | Device types to test (mobile, desktop). Comma-separated. | No | `mobile,desktop` |
-| `categories` | Test categories to run (performance, accessibility, best-practices, seo). Comma-separated. | No | `performance,accessibility,best-practices,seo` |
-| `slack_webhook_url` | Slack Webhook URL to send reports to | Yes (if slack_token not provided) | N/A |
-| `slack_token` | Slack API token | Yes (if slack_webhook_url not provided) | N/A |
-| `slack_channel` | Slack channel to send the report to (without #) | No | (webhook default) |
-| `slack_title` | Title for the Slack message | No | `Lighthouse Test Results` |
-| `fail_on_score_below` | Fail the action if any score is below this threshold (0-100) | No | `0` |
-| `chrome_flags` | Custom flags to pass to Chrome | No | `--no-sandbox --headless --disable-gpu` |
-| `timeout` | Timeout for each test in seconds | No | `60` |
+### Pull Request Validation
 
-## 📊 Slack Report - Message Format
+Test pages on a staging environment whenever a PR is created or updated:
+
+```yaml
+name: Lighthouse PR Validation
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [ opened, synchronize, reopened ]
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Lighthouse CI Slack Reporter
+        uses: MateuszMichalowski/lighthouse-slack-action@v1
+        with:
+          urls: 'https://staging.example.com'
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          slack_title: 'PR #${{ github.event.pull_request.number }} - Lighthouse Results'
+          fail_on_score_below: '80'
+```
+
+### Scheduled Monitoring
+
+Regular monitoring of production website performance:
+
+```yaml
+name: Weekly Lighthouse Monitoring
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'  # Every Monday at 5 AM
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Lighthouse CI Slack Reporter
+        uses: MateuszMichalowski/lighthouse-slack-action@v1
+        with:
+          urls: 'https://example.com,https://example.com/products,https://example.com/blog'
+          device_types: 'mobile,desktop'
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          slack_channel: 'performance-monitoring'
+          slack_title: 'Weekly Performance Report'
+```
+
+## 📋 Slack Report Format
 
 The Slack report includes:
 
-- A header with the title
-- A summary of the tests run
-- Average scores across all tests
-- Detailed results for each URL and device type
-- Color-coded indicators for scores:
-   - 🟢 Green: 90-100
-   - 🟡 Yellow: 50-89
-   - 🔴 Red: 0-49
-- Links to full HTML reports (when available)
+- **Header**: Action title and run summary
+- **Score Table**: URL-by-URL breakdown of scores in a tabular format
+- **Color Coding**:
+    - 🟢 Green: 90-100%
+    - 🟡 Yellow: 50-89%
+    - 🔴 Red: 0-49%
+- **Insights**: Strongest and weakest categories
+- **Device Comparison**: Performance gap between mobile/desktop
+- **Download Links**: Links to full HTML reports when available
 
 ## 🧪 Local Testing
 
+You can test this action locally in two ways:
+
 ### Using Act
 
-You can test this action locally using [act](https://github.com/nektos/act):
-
-1. Install act: `brew install act` or follow the [installation instructions](https://github.com/nektos/act#installation)
+1. Install [act](https://github.com/nektos/act)
 2. Create a `.env` file with your Slack webhook URL:
    ```
    SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
    ```
-3. Run act:
+3. Run the action:
    ```
-   act -j lighthouse --secret-file .env
-   ```
-
-### Using the Included Test Script
-
-A test script is included to make local testing easier:
-
-1. Make sure Chrome is installed on your system
-2. Export your Slack webhook URL:
-   ```
-   export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
-   ```
-3. Run the test script:
-   ```
-   chmod +x test-local.sh
-   ./test-local.sh
+   ./run-act-local.sh
    ```
 
-## 🛠️ Development
+### Using the Test Script
 
-### Prerequisites
+```bash
+export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+chmod +x test-local.sh
+./test-local.sh
+```
 
-- Node.js 16 or later
-- npm
+## 🔍 Troubleshooting
 
-### Setup
+### Common Issues
 
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Build the action: `npm run build`
+1. **Chrome Crashing**
+    - Try adding `--disable-dev-shm-usage` to your Chrome flags
+    - Increase the timeout value
 
-### Commands
+2. **Slack Messages Not Sending**
+    - Check your webhook URL or token permissions
+    - Verify the channel exists and the bot has access
 
-- `npm run build`: Build the action using ncc
-- `npm test`: Run tests
-- `npm run lint`: Run linting
-- `npm run format`: Format code
-- `npm run all`: Run lint, format, and build
+3. **Missing Reports**
+    - Ensure your workflow has sufficient permissions to create artifacts
+    - Check the logs for error messages
 
-## 🔍 Debugging
+4. **Timeout Errors**
+    - Increase the `timeout` parameter for complex pages
+    - Test fewer URLs at once
 
-This action includes detailed logging to help diagnose issues:
+### Debugging
 
-- All steps are logged with emoji prefixes (🚀, 📋, 🔍, etc.)
-- Debug information can be enabled by setting the GitHub Actions secret `ACTIONS_STEP_DEBUG` to `true`
-- If tests fail, check the logs for detailed error messages
-- HTML reports are generated for each test and can be accessed as artifacts
+Enable debug logs by setting the GitHub Actions secret `ACTIONS_STEP_DEBUG` to `true`.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🔗 Related Projects
+## ❓ Need Help?
 
-- [Lighthouse CI](https://github.com/GoogleChrome/lighthouse-ci) - The underlying tool used for Lighthouse testing
-- [Slack API](https://api.slack.com/) - For sending messages to Slack
-
-## 📚 Further Reading
-
-- [Lighthouse Documentation](https://developers.google.com/web/tools/lighthouse)
-- [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [Slack API Documentation](https://api.slack.com/messaging/webhooks)
+- Create an issue on this repository
+- Check out the [GitHub Actions documentation](https://docs.github.com/en/actions)
+- Learn more about [Lighthouse](https://developers.google.com/web/tools/lighthouse)

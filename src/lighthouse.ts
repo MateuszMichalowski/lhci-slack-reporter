@@ -16,13 +16,13 @@ async function runLighthouseForUrl(
     categories: string[],
     chromeFlags: string,
     timeout: number,
-    maxRetries: number = 1
+    maxRetries: number = 2
 ): Promise<LighthouseResult> {
     core.info(`Running Lighthouse for URL: ${url}, Device: ${deviceType}`);
 
     const outputDir = path.resolve(process.cwd(), 'lighthouse-results');
-    const outputFile = path.join(outputDir, `${encodeURIComponent(url)}-${deviceType}.json`);
-    const htmlOutputFile = path.join(outputDir, `${encodeURIComponent(url)}-${deviceType}.html`);
+    const outputFile = path.join(outputDir, `${encodeURIComponent(url.replace(/[^a-zA-Z0-9]/g, '_'))}-${deviceType}.json`);
+    const htmlOutputFile = path.join(outputDir, `${encodeURIComponent(url.replace(/[^a-zA-Z0-9]/g, '_'))}-${deviceType}.html`);
 
     core.debug(`Output directory: ${outputDir}`);
     core.debug(`JSON output file: ${outputFile}`);
@@ -50,15 +50,17 @@ async function runLighthouseForUrl(
 
     const categoriesArg = categories.join(',');
 
+    const sanitizedChromeFlags = chromeFlags.replace(/"/g, '\\"').replace(/;/g, '');
+
     const command = [
         'npx',
         'lighthouse@latest',
-        url,
+        `"${url.replace(/"/g, '\\"')}"`,
         '--output=json,html',
         `--output-path=${outputFile}`,
         deviceType === 'desktop' ? '--preset=desktop' : '',
         `--only-categories=${categoriesArg}`,
-        `--chrome-flags="${chromeFlags}"`,
+        `--chrome-flags="${sanitizedChromeFlags}"`,
         `--max-wait-for-load=${timeout * 1000}`,
         deviceType === 'desktop' ? '--form-factor=desktop' : '--form-factor=mobile',
         deviceType === 'desktop' ? '--emulated-form-factor=desktop' : '--emulated-form-factor=mobile'
@@ -67,11 +69,13 @@ async function runLighthouseForUrl(
     core.debug(`Executing command: ${command}`);
 
     let lastError = null;
+    let retryDelay = 3000;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         if (attempt > 0) {
             core.warning(`Retry attempt ${attempt}/${maxRetries} for URL: ${url}, Device: ${deviceType}`);
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            retryDelay *= 1.5;
         }
 
         try {
@@ -82,12 +86,13 @@ async function runLighthouseForUrl(
                 core.debug(`Command stderr: ${stderr}`);
             }
 
-            if (fs.existsSync(outputDir)) {
-                const files = fs.readdirSync(outputDir);
-                core.debug(`Files in output directory: ${files.join(', ')}`);
-            } else {
+            if (!fs.existsSync(outputDir)) {
                 core.warning(`Output directory does not exist after test: ${outputDir}`);
+                continue;
             }
+
+            const files = fs.readdirSync(outputDir);
+            core.debug(`Files in output directory: ${files.join(', ')}`);
 
             const baseOutputName = path.basename(outputFile, '.json');
             const jsonPattern = new RegExp(`${baseOutputName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*\\.json$`);
@@ -200,26 +205,38 @@ export async function runLighthouseTests(
 
     const sanitizedChromeFlags = chromeFlags.replace(/"/g, '\\"');
 
-    for (const url of urls) {
-        for (const deviceType of deviceTypes) {
-            try {
-                core.info(`Testing ${url} on ${deviceType}...`);
-                const result = await runLighthouseForUrl(url, deviceType, categories, sanitizedChromeFlags, timeout, 2);
-                results.push(result);
-                core.info(`Completed test for ${url} on ${deviceType}`);
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                core.warning(`Failed to test ${url} on ${deviceType}: ${errorMessage}`);
-                errors.push(error instanceof Error ? error : new Error(String(error)));
-                // Continue with other tests even if one fails
-            }
-        }
+    const BATCH_SIZE = 3;
+
+    for (let i = 0; i < urls.length; i += BATCH_SIZE) {
+        const urlBatch = urls.slice(i, i + BATCH_SIZE);
+
+        const batchPromises = urlBatch.flatMap(url =>
+            deviceTypes.map(async (deviceType) => {
+                try {
+                    core.info(`Testing ${url} on ${deviceType}...`);
+                    const result = await runLighthouseForUrl(url, deviceType, categories, sanitizedChromeFlags, timeout, 2);
+                    results.push(result);
+                    core.info(`✅ Completed test for ${url} on ${deviceType}`);
+                    return null;
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    core.warning(`Failed to test ${url} on ${deviceType}: ${errorMessage}`);
+                    errors.push(error instanceof Error ? error : new Error(String(error)));
+                    return error;
+                }
+            })
+        );
+
+        await Promise.all(batchPromises);
     }
 
     core.info(`Completed Lighthouse tests: ${results.length} successful, ${errors.length} failed`);
 
-    if (results.length === 0 && errors.length > 0) {
-        throw new Error(`All Lighthouse tests failed: ${errors.map(e => e.message).join(', ')}`);
+    if (results.length === 0) {
+        if (errors.length > 0) {
+            throw new Error(`All Lighthouse tests failed: ${errors.map(e => e.message).join(', ')}`);
+        }
+        throw new Error('No Lighthouse tests were completed successfully');
     }
 
     return results;

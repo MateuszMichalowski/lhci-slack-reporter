@@ -11,14 +11,20 @@ async function run(): Promise<void> {
     try {
         core.info('🚀 Starting Lighthouse CI Slack Reporter action');
 
-        validateInputs();
+        try {
+            validateInputs();
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.setFailed(`❌ Input validation failed: ${errorMessage}`);
+            return;
+        }
 
         const urls = parseInputArray(core.getInput('urls', { required: true }));
         const deviceTypes = parseInputArray(core.getInput('device_types') || 'mobile,desktop');
         const categories = parseInputArray(core.getInput('categories') || 'performance,accessibility,best-practices,seo');
         const slackTitle = core.getInput('slack_title') || 'Lighthouse Test Results';
         const failOnScoreBelowInput = core.getInput('fail_on_score_below') || '0';
-        const failOnScoreBelow = parseInt(failOnScoreBelowInput) / 100; // Convert to 0-1 scale
+        const failOnScoreBelow = parseInt(failOnScoreBelowInput) / 100;
         const chromeFlags = core.getInput('chrome_flags') || '--no-sandbox --headless --disable-gpu';
         const timeoutInput = core.getInput('timeout') || '60';
         const timeout = parseInt(timeoutInput);
@@ -61,19 +67,36 @@ async function run(): Promise<void> {
                     timeout
                 );
             }
+
+            if (!lighthouseResults || lighthouseResults.length === 0) {
+                throw new Error('No Lighthouse results were generated');
+            }
         } catch (error) {
-            core.warning(`Error running lighthouse tests: ${error}`);
-            throw error;
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.setFailed(`❌ Error running lighthouse tests: ${errorMessage}`);
+            return;
         }
 
         core.info(`✅ Lighthouse tests completed: ${lighthouseResults.length} results`);
 
         core.info('📊 Formatting results for Slack...');
-        const formattedResults = formatLighthouseResults(lighthouseResults);
+        let formattedResults;
+        try {
+            formattedResults = formatLighthouseResults(lighthouseResults);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.setFailed(`❌ Error formatting results: ${errorMessage}`);
+            return;
+        }
 
         core.info('📤 Sending results to Slack...');
-        await sendSlackReport(formattedResults, slackTitle);
-        core.info('✅ Results sent to Slack successfully');
+        try {
+            await sendSlackReport(formattedResults, slackTitle);
+            core.info('✅ Results sent to Slack successfully');
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            core.warning(`⚠️ Failed to send results to Slack: ${errorMessage}`);
+        }
 
         try {
             if (process.env.GITHUB_ACTIONS === 'true') {
@@ -103,9 +126,8 @@ async function run(): Promise<void> {
                 }
             }
         } catch (error) {
-            // Don't fail the whole action if artifact upload fails
             const errorMessage = error instanceof Error ? error.message : String(error);
-            core.warning(`Failed to upload artifacts: ${errorMessage}`);
+            core.warning(`⚠️ Failed to upload artifacts: ${errorMessage}`);
         }
 
         const allScores = lighthouseResults.flatMap(result =>
@@ -117,6 +139,8 @@ async function run(): Promise<void> {
 
         if (lowestScore < failOnScoreBelow) {
             core.setFailed(`❌ One or more scores (${Math.round(lowestScore * 100)}%) are below the threshold of ${Math.round(failOnScoreBelow * 100)}%`);
+        } else {
+            core.info(`✅ All scores are above the threshold of ${Math.round(failOnScoreBelow * 100)}%`);
         }
 
         core.info('🎉 Lighthouse CI Slack Reporter action completed successfully');
