@@ -16,6 +16,9 @@ async function runLighthouseForUrl(
     categories: string[],
     chromeFlags: string,
     timeout: number,
+    throttlingMethod: string,
+    locale: string,
+    lighthouseConfig: string | undefined,
     maxRetries: number = 2
 ): Promise<LighthouseResult> {
     core.info(`Running Lighthouse for URL: ${url}, Device: ${deviceType}`);
@@ -62,8 +65,18 @@ async function runLighthouseForUrl(
         `--only-categories=${categoriesArg}`,
         `--chrome-flags="${sanitizedChromeFlags}"`,
         `--max-wait-for-load=${timeout * 1000}`,
+        deviceType === 'mobile' ? `--throttling-method=${throttlingMethod}` : '--throttling-method=provided',
+        `--locale=${locale}`,
+        '--screenEmulation.mobile=' + (deviceType === 'mobile' ? 'true' : 'false'),
+        '--screenEmulation.width=' + (deviceType === 'mobile' ? '360' : '1350'),
+        '--screenEmulation.height=' + (deviceType === 'mobile' ? '640' : '940'),
+        '--screenEmulation.deviceScaleFactor=' + (deviceType === 'mobile' ? '2' : '1'),
+        '--screenEmulation.disabled=false',
         deviceType === 'desktop' ? '--form-factor=desktop' : '--form-factor=mobile',
-        deviceType === 'desktop' ? '--emulated-form-factor=desktop' : '--emulated-form-factor=mobile'
+        deviceType === 'desktop' ? '--emulated-form-factor=desktop' : '--emulated-form-factor=mobile',
+        '--quiet',
+        '--no-enable-error-reporting',
+        lighthouseConfig ? `--config-path="${lighthouseConfig}"` : ''
     ].filter(Boolean).join(' ');
 
     core.debug(`Executing command: ${command}`);
@@ -189,6 +202,54 @@ async function runLighthouseForUrl(
 }
 
 /**
+ * Average multiple Lighthouse results for the same URL/device
+ */
+function averageLighthouseResults(results: LighthouseResult[]): LighthouseResult {
+    if (results.length === 0) {
+        throw new Error('No results to average');
+    }
+    
+    if (results.length === 1) {
+        return results[0];
+    }
+    
+    const categoryScores: Record<string, number[]> = {};
+    
+    results.forEach(result => {
+        result.categories.forEach(category => {
+            if (!categoryScores[category.id]) {
+                categoryScores[category.id] = [];
+            }
+            categoryScores[category.id].push(category.score);
+        });
+    });
+    
+    const averagedCategories: LighthouseCategory[] = [];
+    for (const [id, scores] of Object.entries(categoryScores)) {
+        const sorted = scores.sort((a, b) => a - b);
+        const median = sorted.length % 2 === 0
+            ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+            : sorted[Math.floor(sorted.length / 2)];
+        
+        const firstResult = results[0].categories.find(c => c.id === id);
+        if (firstResult) {
+            averagedCategories.push({
+                id,
+                title: firstResult.title,
+                score: median
+            });
+        }
+    }
+    
+    return {
+        url: results[0].url,
+        deviceType: results[0].deviceType,
+        categories: averagedCategories,
+        reportUrl: results[0].reportUrl
+    };
+}
+
+/**
  * Run Lighthouse tests for all URLs and device types
  */
 export async function runLighthouseTests(
@@ -196,12 +257,19 @@ export async function runLighthouseTests(
     deviceTypes: string[],
     categories: string[],
     chromeFlags: string,
-    timeout: number
+    timeout: number,
+    throttlingMethod: string = 'simulate',
+    locale: string = 'en-US',
+    runsPerUrl: number = 1,
+    lighthouseConfig?: string
 ): Promise<LighthouseResult[]> {
     const results: LighthouseResult[] = [];
     const errors: Error[] = [];
 
     core.info(`Starting Lighthouse tests for ${urls.length} URLs on ${deviceTypes.length} device types`);
+    if (runsPerUrl > 1) {
+        core.info(`Will run ${runsPerUrl} tests per URL/device and average the results`);
+    }
 
     const sanitizedChromeFlags = chromeFlags.replace(/"/g, '\\"');
 
@@ -212,17 +280,49 @@ export async function runLighthouseTests(
 
         const batchPromises = urlBatch.flatMap(url =>
             deviceTypes.map(async (deviceType) => {
-                try {
-                    core.info(`Testing ${url} on ${deviceType}...`);
-                    const result = await runLighthouseForUrl(url, deviceType, categories, sanitizedChromeFlags, timeout, 2);
-                    results.push(result);
-                    core.info(`✅ Completed test for ${url} on ${deviceType}`);
+                const runResults: LighthouseResult[] = [];
+                
+                for (let run = 1; run <= runsPerUrl; run++) {
+                    try {
+                        if (runsPerUrl > 1) {
+                            core.info(`Testing ${url} on ${deviceType} (run ${run}/${runsPerUrl})...`);
+                        } else {
+                            core.info(`Testing ${url} on ${deviceType}...`);
+                        }
+                        
+                        const result = await runLighthouseForUrl(
+                            url, 
+                            deviceType, 
+                            categories, 
+                            sanitizedChromeFlags, 
+                            timeout,
+                            throttlingMethod,
+                            locale,
+                            lighthouseConfig,
+                            2
+                        );
+                        runResults.push(result);
+                        
+                        if (runsPerUrl > 1) {
+                            core.info(`✅ Completed run ${run}/${runsPerUrl} for ${url} on ${deviceType}`);
+                        }
+                    } catch (error) {
+                        const errorMessage = error instanceof Error ? error.message : String(error);
+                        core.warning(`Failed run ${run}/${runsPerUrl} for ${url} on ${deviceType}: ${errorMessage}`);
+                        if (run === runsPerUrl && runResults.length === 0) {
+                            errors.push(error instanceof Error ? error : new Error(String(error)));
+                            return error;
+                        }
+                    }
+                }
+                
+                if (runResults.length > 0) {
+                    const averagedResult = averageLighthouseResults(runResults);
+                    results.push(averagedResult);
+                    core.info(`✅ Completed test for ${url} on ${deviceType} (averaged from ${runResults.length} runs)`);
                     return null;
-                } catch (error) {
-                    const errorMessage = error instanceof Error ? error.message : String(error);
-                    core.warning(`Failed to test ${url} on ${deviceType}: ${errorMessage}`);
-                    errors.push(error instanceof Error ? error : new Error(String(error)));
-                    return error;
+                } else {
+                    return new Error(`All runs failed for ${url} on ${deviceType}`);
                 }
             })
         );

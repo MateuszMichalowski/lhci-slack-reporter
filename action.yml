@@ -37,7 +37,7 @@ inputs:
   chrome_flags:
     description: 'Custom Chrome flags for Lighthouse'
     required: false
-    default: '--no-sandbox --headless --disable-gpu'
+    default: '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --disable-extensions --no-first-run --disable-background-networking'
   timeout:
     description: 'Timeout for each test in seconds'
     required: false
@@ -46,6 +46,21 @@ inputs:
     description: 'Timeout for Slack API requests in milliseconds'
     required: false
     default: '10000'
+  throttling_method:
+    description: 'Throttling method (simulate, devtools, or provided). Use "provided" to disable throttling'
+    required: false
+    default: 'simulate'
+  locale:
+    description: 'Locale for Lighthouse tests (e.g., en-US)'
+    required: false
+    default: 'en-US'
+  runs_per_url:
+    description: 'Number of test runs per URL (results will be averaged)'
+    required: false
+    default: '1'
+  lighthouse_config:
+    description: 'Path to lighthouserc.json config file'
+    required: false
 
 runs:
   using: "composite"
@@ -89,6 +104,10 @@ runs:
         INPUT_CHROME_FLAGS: ${{ inputs.chrome_flags }}
         INPUT_TIMEOUT: ${{ inputs.timeout }}
         INPUT_SLACK_TIMEOUT_MS: ${{ inputs.slack_timeout_ms }}
+        INPUT_THROTTLING_METHOD: ${{ inputs.throttling_method }}
+        INPUT_LOCALE: ${{ inputs.locale }}
+        INPUT_RUNS_PER_URL: ${{ inputs.runs_per_url }}
+        INPUT_LIGHTHOUSE_CONFIG: ${{ inputs.lighthouse_config }}
 
     - name: Check for Lighthouse reports
       run: |
