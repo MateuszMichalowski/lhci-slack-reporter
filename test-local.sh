@@ -1,9 +1,35 @@
 #!/bin/bash
 set -e
 
+# Load environment variables from .env file if it exists
+if [ -f .env ]; then
+  echo "Loading environment variables from .env file..."
+  # Use a safer method to load .env that handles spaces and special characters
+  set -a
+  source .env
+  set +a
+  echo "✓ Environment variables loaded from .env"
+fi
+
+# Check if SLACK_WEBHOOK_URL is set (either from .env or environment)
 if [ -z "$SLACK_WEBHOOK_URL" ]; then
-  echo "Error: SLACK_WEBHOOK_URL environment variable is not set."
-  echo "Please set it with: export SLACK_WEBHOOK_URL='your_webhook_url'"
+  echo "Error: SLACK_WEBHOOK_URL is not set."
+  echo ""
+  echo "You can set it in one of these ways:"
+  echo "1. Create a .env file with: SLACK_WEBHOOK_URL=your_webhook_url"
+  echo "2. Export it: export SLACK_WEBHOOK_URL='your_webhook_url'"
+  echo ""
+  if [ ! -f .env ]; then
+    echo "No .env file found. Would you like to create one? (y/n)"
+    read -r response
+    if [[ "$response" == "y" ]]; then
+      echo "# Environment variables for local testing" > .env
+      echo "SLACK_WEBHOOK_URL=your_webhook_url_here" >> .env
+      echo ""
+      echo "Created .env file. Please edit it and add your Slack webhook URL."
+      exit 1
+    fi
+  fi
   exit 1
 fi
 
@@ -24,7 +50,7 @@ cat > "$INPUTS_FILE" << EOL
   "slack_webhook_url": "$SLACK_WEBHOOK_URL",
   "slack_title": "Local Test Results",
   "fail_on_score_below": "0",
-  "chrome_flags": "--no-sandbox --headless --disable-gpu",
+  "chrome_flags": "--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage",
   "timeout": "30"
 }
 EOL
@@ -38,7 +64,7 @@ export INPUT_CATEGORIES="performance,accessibility"
 export INPUT_SLACK_WEBHOOK_URL="$SLACK_WEBHOOK_URL"
 export INPUT_SLACK_TITLE="Local Test Results"
 export INPUT_FAIL_ON_SCORE_BELOW="0"
-export INPUT_CHROME_FLAGS="--no-sandbox --headless --disable-gpu"
+export INPUT_CHROME_FLAGS="--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage"
 export INPUT_TIMEOUT="30"
 
 echo "Running the action locally..."

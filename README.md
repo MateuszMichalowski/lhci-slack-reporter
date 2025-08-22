@@ -59,9 +59,13 @@ jobs:
 | `slack_channel` | Slack channel for the report | ❌ | Default from webhook |
 | `slack_title` | Title for the Slack message | ❌ | `Lighthouse Test Results` |
 | `fail_on_score_below` | Fail action if any score is below this threshold (0-100) | ❌ | `0` |
-| `chrome_flags` | Custom Chrome flags | ❌ | `--no-sandbox --headless --disable-gpu` |
+| `chrome_flags` | Custom Chrome flags | ❌ | `--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage` |
 | `timeout` | Timeout for each test in seconds | ❌ | `60` |
 | `slack_timeout_ms` | Timeout for Slack API calls in milliseconds | ❌ | `10000` |
+| `throttling_method` | Throttling method: `simulate`, `devtools`, or `provided` (no throttling) | ❌ | `simulate` |
+| `locale` | Locale for Lighthouse tests (e.g., en-US, fr-FR) | ❌ | `en-US` |
+| `runs_per_url` | Number of test runs per URL (results averaged for stability) | ❌ | `1` |
+| `lighthouse_config` | Path to custom lighthouserc.json config file | ❌ | - |
 
 *Either `slack_webhook_url` or `slack_token` is required
 
@@ -109,11 +113,20 @@ jobs:
           # Fail if any score is below 70
           fail_on_score_below: '70'
           
-          # Custom Chrome flags
-          chrome_flags: '--no-sandbox --headless --disable-gpu --disable-dev-shm-usage'
+          # Custom Chrome flags (using new headless mode)
+          chrome_flags: '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage'
           
           # Test timeout
           timeout: '90'
+          
+          # Network throttling (simulate 3G for mobile, no throttling for desktop)
+          throttling_method: 'simulate'
+          
+          # Run multiple tests and average for stability
+          runs_per_url: '3'
+          
+          # Locale for consistent testing
+          locale: 'en-US'
 ```
 
 ## 💡 Common Use Cases
@@ -204,10 +217,52 @@ You can test this action locally in two ways:
 
 ### Using the Test Script
 
+The test script now supports loading environment variables from a `.env` file:
+
 ```bash
+# Option 1: Copy the example .env file and configure it
+cp .env.example .env
+# Edit .env and add your Slack webhook URL
+
+# Option 2: Or set the environment variable directly
 export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+
+# Run the test script
 chmod +x test-local.sh
 ./test-local.sh
+```
+
+The script will automatically load variables from `.env` if it exists.
+
+## 🎯 Accuracy & Browser Matching
+
+This action is configured to closely match browser-based Lighthouse scores:
+
+### Network Throttling
+- **Mobile**: Simulates Fast 3G network by default (`throttling_method: 'simulate'`)
+- **Desktop**: No throttling (matches browser behavior)
+- **Disable throttling**: Set `throttling_method: 'provided'` for unthrottled tests
+
+### CPU Throttling
+- **Mobile**: 4x CPU slowdown (automatically applied with mobile preset)
+- **Desktop**: No CPU throttling
+
+### Screen Emulation
+- **Mobile**: 360x640 viewport, 2x device pixel ratio
+- **Desktop**: 1350x940 viewport, 1x device pixel ratio
+
+### Multiple Runs for Stability
+Set `runs_per_url` to 3 or 5 for more stable scores (uses median):
+
+```yaml
+runs_per_url: '3'  # Runs 3 tests per URL and averages results
+```
+
+### Custom Configuration
+For full control, provide a Lighthouse config file:
+
+```yaml
+lighthouse_config: '.lighthouserc.json'
 ```
 
 ## 🔍 Troubleshooting

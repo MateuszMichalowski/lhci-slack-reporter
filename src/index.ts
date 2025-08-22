@@ -24,15 +24,26 @@ async function run(): Promise<void> {
         const slackTitle = core.getInput('slack_title') || 'Lighthouse Test Results';
         const failOnScoreBelowInput = core.getInput('fail_on_score_below') || '0';
         const failOnScoreBelow = parseInt(failOnScoreBelowInput) / 100;
-        const chromeFlags = core.getInput('chrome_flags') || '--no-sandbox --headless --disable-gpu';
+        const chromeFlags = core.getInput('chrome_flags') || '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --disable-extensions --no-first-run --disable-background-networking';
         const timeoutInput = core.getInput('timeout') || '60';
         const timeout = parseInt(timeoutInput);
+        const throttlingMethod = core.getInput('throttling_method') || 'simulate';
+        const locale = core.getInput('locale') || 'en-US';
+        const runsPerUrlInput = core.getInput('runs_per_url') || '1';
+        const runsPerUrl = parseInt(runsPerUrlInput);
+        const lighthouseConfig = core.getInput('lighthouse_config');
 
         core.info(`📋 Configuration:`);
         core.info(`  - URLs: ${urls.join(', ')}`);
         core.info(`  - Device types: ${deviceTypes.join(', ')}`);
         core.info(`  - Test categories: ${categories.join(', ')}`);
         core.info(`  - Fail on score below: ${failOnScoreBelow * 100}%`);
+        core.info(`  - Throttling method: ${throttlingMethod}`);
+        core.info(`  - Locale: ${locale}`);
+        core.info(`  - Runs per URL: ${runsPerUrl}`);
+        if (lighthouseConfig) {
+            core.info(`  - Config file: ${lighthouseConfig}`);
+        }
 
         core.info('🔍 Running Lighthouse tests...');
         let lighthouseResults;
@@ -63,7 +74,11 @@ async function run(): Promise<void> {
                     deviceTypes,
                     categories,
                     chromeFlags,
-                    timeout
+                    timeout,
+                    throttlingMethod,
+                    locale,
+                    runsPerUrl,
+                    lighthouseConfig
                 );
             }
 

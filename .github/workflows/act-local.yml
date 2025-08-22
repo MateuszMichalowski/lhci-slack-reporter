@@ -45,6 +45,6 @@ jobs:
           INPUT_SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           INPUT_SLACK_TITLE: 'Mock Test Results'
           INPUT_FAIL_ON_SCORE_BELOW: '0'
-          INPUT_CHROME_FLAGS: '--no-sandbox --headless --disable-gpu'
+          INPUT_CHROME_FLAGS: '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage'
           INPUT_TIMEOUT: '30'
         run: node dist/index.js
