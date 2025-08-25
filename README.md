@@ -62,9 +62,9 @@ jobs:
 | `chrome_flags` | Custom Chrome flags | ❌ | `--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage` |
 | `timeout` | Timeout for each test in seconds | ❌ | `60` |
 | `slack_timeout_ms` | Timeout for Slack API calls in milliseconds | ❌ | `10000` |
-| `throttling_method` | Throttling method: `simulate`, `devtools`, or `provided` (no throttling) | ❌ | `simulate` |
-| `cpu_slowdown_multiplier` | Custom CPU slowdown (e.g., `2` for 2x, `1` for no slowdown) | ❌ | `4` for mobile |
-| `disable_cpu_throttling` | Disable CPU throttling entirely (for slow CI runners) | ❌ | `false` |
+| `throttling_method` | Network throttling: `simulate` (Fast 3G), `devtools`, or `provided` (none) | ❌ | `simulate` |
+| `cpu_slowdown_multiplier` | Custom CPU slowdown for all devices (e.g., `2` for 2x, `1` for none) | ❌ | `4` for mobile, `1` for desktop |
+| `disable_cpu_throttling` | Disable CPU throttling for all devices (keeps network throttling) | ❌ | `false` |
 | `locale` | Locale for Lighthouse tests (e.g., en-US, fr-FR) | ❌ | `en-US` |
 | `runs_per_url` | Number of test runs per URL (results averaged for stability) | ❌ | `1` |
 | `lighthouse_config` | Path to custom lighthouserc.json config file | ❌ | - |
@@ -246,8 +246,10 @@ This action is configured to closely match browser-based Lighthouse scores:
 - **Disable throttling**: Set `throttling_method: 'provided'` for unthrottled tests
 
 ### CPU Throttling
-- **Mobile**: 4x CPU slowdown (automatically applied with mobile preset)
-- **Desktop**: No CPU throttling
+- **Mobile**: 4x CPU slowdown by default (can be customized)
+- **Desktop**: No CPU throttling (1x) by default
+- **Custom**: Use `cpu_slowdown_multiplier` to set for all devices
+- **Disable**: Use `disable_cpu_throttling: 'true'` for all devices
 
 ### Screen Emulation
 - **Mobile**: 360x640 viewport, 2x device pixel ratio
@@ -275,20 +277,21 @@ lighthouse_config: '.lighthouserc.json'
    
    If you see: *"The tested device appears to have a slower CPU than Lighthouse expects"*
    
-   **Solution 1: Disable CPU throttling for CI**
+   **Solution 1: Disable CPU throttling only (recommended)**
    ```yaml
-   disable_cpu_throttling: 'true'  # Best for slow GitHub Actions runners
+   disable_cpu_throttling: 'true'  # Disables CPU throttling for all devices
+   # Network throttling remains active (Fast 3G for mobile)
    ```
    
    **Solution 2: Use custom CPU multiplier**
    ```yaml
-   cpu_slowdown_multiplier: '2'  # Reduce from default 4x to 2x
+   cpu_slowdown_multiplier: '2'  # Reduce from 4x to 2x for all devices
    ```
    
-   **Solution 3: Disable all throttling**
+   **Solution 3: Disable all throttling (network + CPU)**
    ```yaml
-   throttling_method: 'provided'  # Disables network and CPU throttling
-   disable_cpu_throttling: 'true'
+   throttling_method: 'provided'  # Disables network throttling
+   disable_cpu_throttling: 'true'  # Disables CPU throttling
    ```
 
 2. **Chrome Crashing**

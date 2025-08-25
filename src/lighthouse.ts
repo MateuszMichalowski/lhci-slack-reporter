@@ -61,13 +61,12 @@ async function runLighthouseForUrl(
     let cpuThrottlingArgs = '';
     
     if (disableCpuThrottling) {
-        effectiveThrottlingMethod = 'provided';
         cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=1';
-        core.debug('CPU throttling disabled for slow CI runner');
+        core.debug(`CPU throttling disabled for ${deviceType} (network throttling: ${throttlingMethod})`);
     } else if (cpuSlowdownMultiplier !== undefined) {
         cpuThrottlingArgs = `--throttling.cpuSlowdownMultiplier=${cpuSlowdownMultiplier}`;
-        core.debug(`Using custom CPU slowdown multiplier: ${cpuSlowdownMultiplier}`);
-    } else if (deviceType === 'mobile' && throttlingMethod === 'provided') {
+        core.debug(`Using custom CPU slowdown multiplier: ${cpuSlowdownMultiplier}x for ${deviceType}`);
+    } else if (deviceType === 'desktop') {
         cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=1';
     }
     
