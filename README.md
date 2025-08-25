@@ -60,7 +60,9 @@ jobs:
 | `slack_title` | Title for the Slack message | ❌ | `Lighthouse Test Results` |
 | `fail_on_score_below` | Fail action if any score is below this threshold (0-100) | ❌ | `0` |
 | `chrome_flags` | Custom Chrome flags | ❌ | `--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage` |
-| `timeout` | Timeout for each test in seconds | ❌ | `60` |
+| `timeout` | Timeout for each test in seconds | ❌ | `120` |
+| `desktop_timeout` | Specific timeout for desktop tests (overrides timeout) | ❌ | Uses `timeout` value |
+| `max_wait_for_fcp` | Max wait for First Contentful Paint in milliseconds | ❌ | `30000` |
 | `slack_timeout_ms` | Timeout for Slack API calls in milliseconds | ❌ | `10000` |
 | `throttling_method` | Network throttling: `simulate` (Fast 3G), `devtools`, or `provided` (none) | ❌ | `simulate` |
 | `cpu_slowdown_multiplier` | Custom CPU slowdown for all devices (e.g., `2` for 2x, `1` for none) | ❌ | `4` for mobile, `1` for desktop |
@@ -294,7 +296,30 @@ lighthouse_config: '.lighthouserc.json'
    disable_cpu_throttling: 'true'  # Disables CPU throttling
    ```
 
-2. **Chrome Crashing**
+2. **"Page loaded too slowly" Error**
+   
+   If you see: *"The page loaded too slowly to finish within the time limit"*
+   
+   **Solution 1: Increase timeout for desktop tests**
+   ```yaml
+   timeout: '180'  # 3 minutes for all tests
+   desktop_timeout: '240'  # 4 minutes specifically for desktop
+   ```
+   
+   **Solution 2: Increase First Contentful Paint timeout**
+   ```yaml
+   max_wait_for_fcp: '60000'  # Wait up to 60 seconds for FCP
+   ```
+   
+   **Solution 3: For very slow pages, combine both**
+   ```yaml
+   timeout: '180'
+   desktop_timeout: '300'  # 5 minutes for desktop
+   max_wait_for_fcp: '60000'
+   disable_cpu_throttling: 'true'  # Also disable CPU throttling
+   ```
+
+3. **Chrome Crashing**
     - Try adding `--disable-dev-shm-usage` to your Chrome flags
     - Increase the timeout value
 
