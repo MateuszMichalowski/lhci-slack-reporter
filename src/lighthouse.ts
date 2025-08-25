@@ -29,8 +29,6 @@ async function runLighthouseForUrl(
     const outputDir = path.resolve(process.cwd(), 'lighthouse-results');
     const baseOutputName = `${encodeURIComponent(url.replace(/[^a-zA-Z0-9]/g, '_'))}-${deviceType}`;
     const outputPath = path.join(outputDir, baseOutputName);
-    const outputFile = path.join(outputDir, `${baseOutputName}.json`);
-    const htmlOutputFile = path.join(outputDir, `${baseOutputName}.html`);
 
     core.debug(`Output directory: ${outputDir}`);
     core.debug(`Base output path: ${outputPath}`);
