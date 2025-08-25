@@ -27,12 +27,13 @@ async function runLighthouseForUrl(
     core.info(`Running Lighthouse for URL: ${url}, Device: ${deviceType}`);
 
     const outputDir = path.resolve(process.cwd(), 'lighthouse-results');
-    const outputFile = path.join(outputDir, `${encodeURIComponent(url.replace(/[^a-zA-Z0-9]/g, '_'))}-${deviceType}.json`);
-    const htmlOutputFile = path.join(outputDir, `${encodeURIComponent(url.replace(/[^a-zA-Z0-9]/g, '_'))}-${deviceType}.html`);
+    const baseOutputName = `${encodeURIComponent(url.replace(/[^a-zA-Z0-9]/g, '_'))}-${deviceType}`;
+    const outputPath = path.join(outputDir, baseOutputName);
 
     core.debug(`Output directory: ${outputDir}`);
-    core.debug(`JSON output file: ${outputFile}`);
-    core.debug(`HTML output file: ${htmlOutputFile}`);
+    core.debug(`Base output path: ${outputPath}`);
+    core.debug(`Expected JSON output file: ${outputPath}.report.json`);
+    core.debug(`Expected HTML output file: ${outputPath}.report.html`);
 
     if (!fs.existsSync(outputDir)) {
         try {
@@ -76,7 +77,7 @@ async function runLighthouseForUrl(
         'lighthouse@latest',
         `"${url.replace(/"/g, '\\"')}"`,
         '--output=json,html',
-        `--output-path=${outputFile}`,
+        `--output-path=${outputPath}`,
         deviceType === 'desktop' ? '--preset=desktop' : '',
         `--only-categories=${categoriesArg}`,
         `--chrome-flags="${sanitizedChromeFlags}"`,
@@ -127,26 +128,22 @@ async function runLighthouseForUrl(
             const files = fs.readdirSync(outputDir);
             core.debug(`Files in output directory: ${files.join(', ')}`);
 
-            const baseOutputName = path.basename(outputFile, '.json');
-            const jsonPattern = new RegExp(`${baseOutputName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*\\.json$`);
+            const expectedJsonFile = `${baseOutputName}.report.json`;
+            const expectedHtmlFile = `${baseOutputName}.report.html`;
+            
+            const jsonFilePath = path.join(outputDir, expectedJsonFile);
+            const htmlFilePath = path.join(outputDir, expectedHtmlFile);
 
-            const jsonFiles = fs.readdirSync(outputDir)
-                .filter(file => jsonPattern.test(file));
-
-            if (jsonFiles.length === 0) {
-                throw new Error(`No JSON output files found matching pattern in ${outputDir}`);
+            if (!fs.existsSync(jsonFilePath)) {
+                core.error(`Expected JSON file not found: ${jsonFilePath}`);
+                core.debug(`Files in directory: ${fs.readdirSync(outputDir).join(', ')}`);
+                throw new Error(`JSON output file not found: ${expectedJsonFile} in ${outputDir}`);
             }
 
-            jsonFiles.sort((a, b) => {
-                return fs.statSync(path.join(outputDir, b)).mtime.getTime() -
-                    fs.statSync(path.join(outputDir, a)).mtime.getTime();
-            });
-
-            const newestJsonFile = path.join(outputDir, jsonFiles[0]);
-            core.debug(`Found JSON result file: ${newestJsonFile}`);
+            core.debug(`Found JSON result file: ${jsonFilePath}`);
 
             try {
-                const rawResults = fs.readFileSync(newestJsonFile, 'utf8');
+                const rawResults = fs.readFileSync(jsonFilePath, 'utf8');
                 core.debug(`Raw results file content (first 200 chars): ${rawResults.substring(0, 200)}...`);
 
                 const results = JSON.parse(rawResults);
@@ -155,21 +152,10 @@ async function runLighthouseForUrl(
                     throw new Error(`Invalid Lighthouse results: missing 'categories' property`);
                 }
 
-                const htmlPattern = new RegExp(`${baseOutputName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*\\.html$`);
-                const htmlFiles = fs.readdirSync(outputDir)
-                    .filter(file => htmlPattern.test(file));
-
                 let reportUrl = '';
-                if (htmlFiles.length > 0) {
-                    htmlFiles.sort((a, b) => {
-                        return fs.statSync(path.join(outputDir, b)).mtime.getTime() -
-                            fs.statSync(path.join(outputDir, a)).mtime.getTime();
-                    });
-
-                    const newestHtmlFile = path.join(outputDir, htmlFiles[0]);
-                    core.debug(`Found HTML report file: ${newestHtmlFile}`);
-
-                    reportUrl = newestHtmlFile;
+                if (fs.existsSync(htmlFilePath)) {
+                    core.debug(`Found HTML report file: ${htmlFilePath}`);
+                    reportUrl = htmlFilePath;
                 } else {
                     core.warning(`No HTML report found for ${url} on ${deviceType}`);
                 }
