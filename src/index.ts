@@ -25,8 +25,12 @@ async function run(): Promise<void> {
         const failOnScoreBelowInput = core.getInput('fail_on_score_below') || '0';
         const failOnScoreBelow = parseInt(failOnScoreBelowInput) / 100;
         const chromeFlags = core.getInput('chrome_flags') || '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --disable-extensions --no-first-run --disable-background-networking';
-        const timeoutInput = core.getInput('timeout') || '60';
+        const timeoutInput = core.getInput('timeout') || '120';
         const timeout = parseInt(timeoutInput);
+        const desktopTimeoutInput = core.getInput('desktop_timeout');
+        const desktopTimeout = desktopTimeoutInput ? parseInt(desktopTimeoutInput) : timeout;
+        const maxWaitForFcpInput = core.getInput('max_wait_for_fcp') || '30000';
+        const maxWaitForFcp = parseInt(maxWaitForFcpInput);
         const throttlingMethod = core.getInput('throttling_method') || 'simulate';
         const cpuSlowdownMultiplierInput = core.getInput('cpu_slowdown_multiplier');
         const cpuSlowdownMultiplier = cpuSlowdownMultiplierInput ? parseFloat(cpuSlowdownMultiplierInput) : undefined;
@@ -41,6 +45,7 @@ async function run(): Promise<void> {
         core.info(`  - Device types: ${deviceTypes.join(', ')}`);
         core.info(`  - Test categories: ${categories.join(', ')}`);
         core.info(`  - Fail on score below: ${failOnScoreBelow * 100}%`);
+        core.info(`  - Timeout: ${timeout}s (Desktop: ${desktopTimeout}s)`);
         core.info(`  - Throttling method: ${throttlingMethod}`);
         if (disableCpuThrottling) {
             core.info(`  - CPU throttling: DISABLED (for slow CI runners)`);
@@ -88,7 +93,9 @@ async function run(): Promise<void> {
                     runsPerUrl,
                     lighthouseConfig,
                     cpuSlowdownMultiplier,
-                    disableCpuThrottling
+                    disableCpuThrottling,
+                    desktopTimeout,
+                    maxWaitForFcp
                 );
             }
 

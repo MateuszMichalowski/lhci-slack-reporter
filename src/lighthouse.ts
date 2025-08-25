@@ -21,6 +21,7 @@ async function runLighthouseForUrl(
     lighthouseConfig: string | undefined,
     cpuSlowdownMultiplier: number | undefined,
     disableCpuThrottling: boolean,
+    maxWaitForFcp: number,
     maxRetries: number = 2
 ): Promise<LighthouseResult> {
     core.info(`Running Lighthouse for URL: ${url}, Device: ${deviceType}`);
@@ -80,6 +81,9 @@ async function runLighthouseForUrl(
         `--only-categories=${categoriesArg}`,
         `--chrome-flags="${sanitizedChromeFlags}"`,
         `--max-wait-for-load=${timeout * 1000}`,
+        `--max-wait-for-fcp=${maxWaitForFcp}`,
+        '--timeout=' + (timeout * 1000),
+        '--gather-mode=navigation',
         deviceType === 'mobile' ? `--throttling-method=${effectiveThrottlingMethod}` : '--throttling-method=provided',
         cpuThrottlingArgs,
         `--locale=${locale}`,
@@ -279,7 +283,9 @@ export async function runLighthouseTests(
     runsPerUrl: number = 1,
     lighthouseConfig?: string,
     cpuSlowdownMultiplier?: number,
-    disableCpuThrottling: boolean = false
+    disableCpuThrottling: boolean = false,
+    desktopTimeout?: number,
+    maxWaitForFcp: number = 30000
 ): Promise<LighthouseResult[]> {
     const results: LighthouseResult[] = [];
     const errors: Error[] = [];
@@ -308,17 +314,20 @@ export async function runLighthouseTests(
                             core.info(`Testing ${url} on ${deviceType}...`);
                         }
                         
+                        const effectiveTimeout = (deviceType === 'desktop' && desktopTimeout) ? desktopTimeout : timeout;
+                        
                         const result = await runLighthouseForUrl(
                             url, 
                             deviceType, 
                             categories, 
                             sanitizedChromeFlags, 
-                            timeout,
+                            effectiveTimeout,
                             throttlingMethod,
                             locale,
                             lighthouseConfig,
                             cpuSlowdownMultiplier,
                             disableCpuThrottling,
+                            maxWaitForFcp,
                             2
                         );
                         runResults.push(result);
