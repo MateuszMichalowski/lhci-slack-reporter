@@ -57,7 +57,7 @@ async function runLighthouseForUrl(
 
     const sanitizedChromeFlags = chromeFlags.replace(/"/g, '\\"').replace(/;/g, '');
 
-    let effectiveThrottlingMethod = throttlingMethod;
+    const effectiveThrottlingMethod = throttlingMethod;
     let cpuThrottlingArgs = '';
     
     if (disableCpuThrottling) {
