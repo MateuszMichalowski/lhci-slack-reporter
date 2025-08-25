@@ -19,6 +19,8 @@ async function runLighthouseForUrl(
     throttlingMethod: string,
     locale: string,
     lighthouseConfig: string | undefined,
+    cpuSlowdownMultiplier: number | undefined,
+    disableCpuThrottling: boolean,
     maxRetries: number = 2
 ): Promise<LighthouseResult> {
     core.info(`Running Lighthouse for URL: ${url}, Device: ${deviceType}`);
@@ -55,6 +57,20 @@ async function runLighthouseForUrl(
 
     const sanitizedChromeFlags = chromeFlags.replace(/"/g, '\\"').replace(/;/g, '');
 
+    let effectiveThrottlingMethod = throttlingMethod;
+    let cpuThrottlingArgs = '';
+    
+    if (disableCpuThrottling) {
+        effectiveThrottlingMethod = 'provided';
+        cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=1';
+        core.debug('CPU throttling disabled for slow CI runner');
+    } else if (cpuSlowdownMultiplier !== undefined) {
+        cpuThrottlingArgs = `--throttling.cpuSlowdownMultiplier=${cpuSlowdownMultiplier}`;
+        core.debug(`Using custom CPU slowdown multiplier: ${cpuSlowdownMultiplier}`);
+    } else if (deviceType === 'mobile' && throttlingMethod === 'provided') {
+        cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=1';
+    }
+    
     const command = [
         'npx',
         'lighthouse@latest',
@@ -65,7 +81,8 @@ async function runLighthouseForUrl(
         `--only-categories=${categoriesArg}`,
         `--chrome-flags="${sanitizedChromeFlags}"`,
         `--max-wait-for-load=${timeout * 1000}`,
-        deviceType === 'mobile' ? `--throttling-method=${throttlingMethod}` : '--throttling-method=provided',
+        deviceType === 'mobile' ? `--throttling-method=${effectiveThrottlingMethod}` : '--throttling-method=provided',
+        cpuThrottlingArgs,
         `--locale=${locale}`,
         '--screenEmulation.mobile=' + (deviceType === 'mobile' ? 'true' : 'false'),
         '--screenEmulation.width=' + (deviceType === 'mobile' ? '360' : '1350'),
@@ -261,7 +278,9 @@ export async function runLighthouseTests(
     throttlingMethod: string = 'simulate',
     locale: string = 'en-US',
     runsPerUrl: number = 1,
-    lighthouseConfig?: string
+    lighthouseConfig?: string,
+    cpuSlowdownMultiplier?: number,
+    disableCpuThrottling: boolean = false
 ): Promise<LighthouseResult[]> {
     const results: LighthouseResult[] = [];
     const errors: Error[] = [];
@@ -299,6 +318,8 @@ export async function runLighthouseTests(
                             throttlingMethod,
                             locale,
                             lighthouseConfig,
+                            cpuSlowdownMultiplier,
+                            disableCpuThrottling,
                             2
                         );
                         runResults.push(result);
