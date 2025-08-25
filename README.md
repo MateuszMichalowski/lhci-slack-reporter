@@ -63,6 +63,8 @@ jobs:
 | `timeout` | Timeout for each test in seconds | ❌ | `60` |
 | `slack_timeout_ms` | Timeout for Slack API calls in milliseconds | ❌ | `10000` |
 | `throttling_method` | Throttling method: `simulate`, `devtools`, or `provided` (no throttling) | ❌ | `simulate` |
+| `cpu_slowdown_multiplier` | Custom CPU slowdown (e.g., `2` for 2x, `1` for no slowdown) | ❌ | `4` for mobile |
+| `disable_cpu_throttling` | Disable CPU throttling entirely (for slow CI runners) | ❌ | `false` |
 | `locale` | Locale for Lighthouse tests (e.g., en-US, fr-FR) | ❌ | `en-US` |
 | `runs_per_url` | Number of test runs per URL (results averaged for stability) | ❌ | `1` |
 | `lighthouse_config` | Path to custom lighthouserc.json config file | ❌ | - |
@@ -112,7 +114,7 @@ jobs:
           
           # Fail if any score is below 70
           fail_on_score_below: '70'
-          
+
           # Custom Chrome flags (using new headless mode)
           chrome_flags: '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage'
           
@@ -269,7 +271,27 @@ lighthouse_config: '.lighthouserc.json'
 
 ### Common Issues
 
-1. **Chrome Crashing**
+1. **"Slower CPU than expected" Warning**
+   
+   If you see: *"The tested device appears to have a slower CPU than Lighthouse expects"*
+   
+   **Solution 1: Disable CPU throttling for CI**
+   ```yaml
+   disable_cpu_throttling: 'true'  # Best for slow GitHub Actions runners
+   ```
+   
+   **Solution 2: Use custom CPU multiplier**
+   ```yaml
+   cpu_slowdown_multiplier: '2'  # Reduce from default 4x to 2x
+   ```
+   
+   **Solution 3: Disable all throttling**
+   ```yaml
+   throttling_method: 'provided'  # Disables network and CPU throttling
+   disable_cpu_throttling: 'true'
+   ```
+
+2. **Chrome Crashing**
     - Try adding `--disable-dev-shm-usage` to your Chrome flags
     - Increase the timeout value
 

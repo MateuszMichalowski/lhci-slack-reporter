@@ -28,6 +28,9 @@ async function run(): Promise<void> {
         const timeoutInput = core.getInput('timeout') || '60';
         const timeout = parseInt(timeoutInput);
         const throttlingMethod = core.getInput('throttling_method') || 'simulate';
+        const cpuSlowdownMultiplierInput = core.getInput('cpu_slowdown_multiplier');
+        const cpuSlowdownMultiplier = cpuSlowdownMultiplierInput ? parseFloat(cpuSlowdownMultiplierInput) : undefined;
+        const disableCpuThrottling = core.getInput('disable_cpu_throttling') === 'true';
         const locale = core.getInput('locale') || 'en-US';
         const runsPerUrlInput = core.getInput('runs_per_url') || '1';
         const runsPerUrl = parseInt(runsPerUrlInput);
@@ -39,6 +42,11 @@ async function run(): Promise<void> {
         core.info(`  - Test categories: ${categories.join(', ')}`);
         core.info(`  - Fail on score below: ${failOnScoreBelow * 100}%`);
         core.info(`  - Throttling method: ${throttlingMethod}`);
+        if (disableCpuThrottling) {
+            core.info(`  - CPU throttling: DISABLED (for slow CI runners)`);
+        } else if (cpuSlowdownMultiplier !== undefined) {
+            core.info(`  - CPU slowdown multiplier: ${cpuSlowdownMultiplier}x`);
+        }
         core.info(`  - Locale: ${locale}`);
         core.info(`  - Runs per URL: ${runsPerUrl}`);
         if (lighthouseConfig) {
@@ -78,7 +86,9 @@ async function run(): Promise<void> {
                     throttlingMethod,
                     locale,
                     runsPerUrl,
-                    lighthouseConfig
+                    lighthouseConfig,
+                    cpuSlowdownMultiplier,
+                    disableCpuThrottling
                 );
             }
 

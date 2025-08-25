@@ -50,6 +50,14 @@ inputs:
     description: 'Throttling method (simulate, devtools, or provided). Use "provided" to disable throttling'
     required: false
     default: 'simulate'
+  cpu_slowdown_multiplier:
+    description: 'CPU slowdown multiplier for mobile tests (e.g., 2 for 2x slowdown, 1 for no slowdown). Default is 4 for mobile.'
+    required: false
+    default: ''
+  disable_cpu_throttling:
+    description: 'Disable CPU throttling entirely (useful for slow CI runners)'
+    required: false
+    default: 'false'
   locale:
     description: 'Locale for Lighthouse tests (e.g., en-US)'
     required: false
@@ -105,6 +113,8 @@ runs:
         INPUT_TIMEOUT: ${{ inputs.timeout }}
         INPUT_SLACK_TIMEOUT_MS: ${{ inputs.slack_timeout_ms }}
         INPUT_THROTTLING_METHOD: ${{ inputs.throttling_method }}
+        INPUT_CPU_SLOWDOWN_MULTIPLIER: ${{ inputs.cpu_slowdown_multiplier }}
+        INPUT_DISABLE_CPU_THROTTLING: ${{ inputs.disable_cpu_throttling }}
         INPUT_LOCALE: ${{ inputs.locale }}
         INPUT_RUNS_PER_URL: ${{ inputs.runs_per_url }}
         INPUT_LIGHTHOUSE_CONFIG: ${{ inputs.lighthouse_config }}
