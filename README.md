@@ -115,8 +115,8 @@ jobs:
           # Fail if any score is below 70
           fail_on_score_below: '70'
           
-          # Custom Chrome flags (using new headless mode)
-          chrome_flags: '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage'
+          # Custom Chrome flags
+          chrome_flags: '--no-sandbox --headless --disable-gpu --disable-dev-shm-usage'
           
           # Test timeout
           timeout: '90'
