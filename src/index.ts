@@ -40,14 +40,14 @@ async function run(): Promise<void> {
         const chromeLaunchTimeout = parseInt(core.getInput('chrome_launch_timeout') || '30000');
         const performancePreset = core.getInput('performance_preset') || 'browser-match';
 
-        core.info(`📋 Configuration:`);
+        core.info('📋 Configuration:');
         core.info(`  - URLs: ${urls.join(', ')}`);
         core.info(`  - Device types: ${deviceTypes.join(', ')}`);
         core.info(`  - Test categories: ${categories.join(', ')}`);
         core.info(`  - Fail on score below: ${failOnScoreBelow * 100}%`);
         core.info(`  - Throttling method: ${throttlingMethod}`);
         if (disableCpuThrottling) {
-            core.info(`  - CPU throttling: DISABLED (for slow CI runners)`);
+            core.info('  - CPU throttling: DISABLED (for slow CI runners)');
         } else if (cpuSlowdownMultiplier !== undefined) {
             core.info(`  - CPU slowdown multiplier: ${cpuSlowdownMultiplier}x`);
         }

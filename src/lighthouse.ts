@@ -59,7 +59,7 @@ async function runLighthouseForUrl(
 
     const effectiveThrottlingMethod = throttlingMethod;
     let cpuThrottlingArgs = '';
-    
+
     if (disableCpuThrottling) {
         cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=1';
         core.debug(`CPU throttling disabled for ${deviceType} (network throttling: ${throttlingMethod})`);
@@ -70,9 +70,9 @@ async function runLighthouseForUrl(
         cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=1';
     } else if (deviceType === 'mobile') {
         cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=2';
-        core.debug(`Using optimized mobile CPU slowdown: 2x (instead of default 4x) for better CI accuracy`);
+        core.debug('Using optimized mobile CPU slowdown: 2x (instead of default 4x) for better CI accuracy');
     }
-    
+
     const command = [
         'npx',
         'lighthouse@latest',
@@ -154,7 +154,7 @@ async function runLighthouseForUrl(
                 const results = JSON.parse(rawResults);
 
                 if (!results.categories) {
-                    throw new Error(`Invalid Lighthouse results: missing 'categories' property`);
+                    throw new Error('Invalid Lighthouse results: missing \'categories\' property');
                 }
 
                 const htmlPattern = new RegExp(`${baseOutputName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*\\.html$`);
@@ -230,13 +230,13 @@ function averageLighthouseResults(results: LighthouseResult[]): LighthouseResult
     if (results.length === 0) {
         throw new Error('No results to average');
     }
-    
+
     if (results.length === 1) {
         return results[0];
     }
-    
+
     const categoryScores: Record<string, number[]> = {};
-    
+
     results.forEach(result => {
         result.categories.forEach(category => {
             if (!categoryScores[category.id]) {
@@ -245,14 +245,14 @@ function averageLighthouseResults(results: LighthouseResult[]): LighthouseResult
             categoryScores[category.id].push(category.score);
         });
     });
-    
+
     const averagedCategories: LighthouseCategory[] = [];
     for (const [id, scores] of Object.entries(categoryScores)) {
         const sorted = scores.sort((a, b) => a - b);
         const median = sorted.length % 2 === 0
             ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
             : sorted[Math.floor(sorted.length / 2)];
-        
+
         const firstResult = results[0].categories.find(c => c.id === id);
         if (firstResult) {
             averagedCategories.push({
@@ -262,7 +262,7 @@ function averageLighthouseResults(results: LighthouseResult[]): LighthouseResult
             });
         }
     }
-    
+
     return {
         url: results[0].url,
         deviceType: results[0].deviceType,
@@ -287,21 +287,21 @@ export async function runLighthouseTests(
     cpuSlowdownMultiplier?: number,
     disableCpuThrottling: boolean = false,
     warmupRuns: number = 1,
-    chromeLaunchTimeout: number = 30000,
+    _chromeLaunchTimeout: number = 30000,
     performancePreset: string = 'browser-match'
 ): Promise<LighthouseResult[]> {
     const results: LighthouseResult[] = [];
     const errors: Error[] = [];
 
     core.info(`Starting Lighthouse tests for ${urls.length} URLs on ${deviceTypes.length} device types`);
-    core.info(`📊 Performance Configuration:`);
+    core.info('📊 Performance Configuration:');
     core.info(`  - Preset: ${performancePreset}`);
     core.info(`  - Throttling method: ${throttlingMethod}`);
-    
+
     if (warmupRuns > 0) {
         core.info(`  - Warmup runs: ${warmupRuns} (stabilizes performance metrics)`);
     }
-    
+
     if (runsPerUrl > 1) {
         core.info(`  - Test runs per URL: ${runsPerUrl} (results will be averaged)`);
     }
@@ -317,7 +317,7 @@ export async function runLighthouseTests(
         const batchPromises = urlBatch.flatMap(url =>
             deviceTypes.map(async (deviceType) => {
                 const runResults: LighthouseResult[] = [];
-                
+
                 if (warmupRuns > 0) {
                     for (let warmup = 1; warmup <= warmupRuns; warmup++) {
                         try {
@@ -341,7 +341,7 @@ export async function runLighthouseTests(
                         }
                     }
                 }
-                
+
                 for (let run = 1; run <= runsPerUrl; run++) {
                     try {
                         if (runsPerUrl > 1) {
@@ -349,12 +349,12 @@ export async function runLighthouseTests(
                         } else {
                             core.info(`Testing ${url} on ${deviceType}...`);
                         }
-                        
+
                         const result = await runLighthouseForUrl(
-                            url, 
-                            deviceType, 
-                            categories, 
-                            sanitizedChromeFlags, 
+                            url,
+                            deviceType,
+                            categories,
+                            sanitizedChromeFlags,
                             timeout,
                             throttlingMethod,
                             locale,
@@ -364,7 +364,7 @@ export async function runLighthouseTests(
                             2
                         );
                         runResults.push(result);
-                        
+
                         if (runsPerUrl > 1) {
                             core.info(`✅ Completed run ${run}/${runsPerUrl} for ${url} on ${deviceType}`);
                         }
@@ -377,7 +377,7 @@ export async function runLighthouseTests(
                         }
                     }
                 }
-                
+
                 if (runResults.length > 0) {
                     const averagedResult = averageLighthouseResults(runResults);
                     results.push(averagedResult);
@@ -394,24 +394,24 @@ export async function runLighthouseTests(
 
     const testEndTime = Date.now();
     const totalTestTime = (testEndTime - testStartTime) / 1000;
-    
+
     core.info(`Completed Lighthouse tests: ${results.length} successful, ${errors.length} failed`);
-    
-    core.info(`📊 Performance Metrics Summary:`);
+
+    core.info('📊 Performance Metrics Summary:');
     core.info(`  - Total test time: ${totalTestTime.toFixed(1)}s`);
     core.info(`  - Average time per URL: ${(totalTestTime / (urls.length * deviceTypes.length)).toFixed(1)}s`);
-    
+
     if (results.length > 0 && runsPerUrl > 1) {
         const performanceScores = results
             .filter(r => r.categories.find(c => c.id === 'performance'))
             .map(r => r.categories.find(c => c.id === 'performance')?.score || 0);
-        
+
         if (performanceScores.length > 0) {
             const avgScore = performanceScores.reduce((a, b) => a + b, 0) / performanceScores.length;
             const minScore = Math.min(...performanceScores);
             const maxScore = Math.max(...performanceScores);
             const variance = maxScore - minScore;
-            
+
             core.info(`  - Average performance score: ${Math.round(avgScore * 100)}%`);
             core.info(`  - Score variance: ${Math.round(variance * 100)}% ${variance < 0.1 ? '✅' : '⚠️'}`);
         }
