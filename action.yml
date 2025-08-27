@@ -41,7 +41,15 @@ inputs:
   timeout:
     description: 'Timeout for each test in seconds'
     required: false
-    default: '60'
+    default: '120'
+  desktop_timeout:
+    description: 'Specific timeout for desktop tests in seconds (overrides timeout)'
+    required: false
+    default: ''
+  max_wait_for_fcp:
+    description: 'Maximum wait time for First Contentful Paint in milliseconds'
+    required: false
+    default: '30000'
   slack_timeout_ms:
     description: 'Timeout for Slack API requests in milliseconds'
     required: false
@@ -123,6 +131,8 @@ runs:
         INPUT_FAIL_ON_SCORE_BELOW: ${{ inputs.fail_on_score_below }}
         INPUT_CHROME_FLAGS: ${{ inputs.chrome_flags }}
         INPUT_TIMEOUT: ${{ inputs.timeout }}
+        INPUT_DESKTOP_TIMEOUT: ${{ inputs.desktop_timeout }}
+        INPUT_MAX_WAIT_FOR_FCP: ${{ inputs.max_wait_for_fcp }}
         INPUT_SLACK_TIMEOUT_MS: ${{ inputs.slack_timeout_ms }}
         INPUT_THROTTLING_METHOD: ${{ inputs.throttling_method }}
         INPUT_CPU_SLOWDOWN_MULTIPLIER: ${{ inputs.cpu_slowdown_multiplier }}

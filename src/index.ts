@@ -25,7 +25,7 @@ async function run(): Promise<void> {
         const failOnScoreBelowInput = core.getInput('fail_on_score_below') || '0';
         const failOnScoreBelow = parseInt(failOnScoreBelowInput) / 100;
         const chromeFlags = core.getInput('chrome_flags') || '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --disable-extensions --no-first-run --disable-background-networking --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --force-color-profile=srgb --enable-features=NetworkService,NetworkServiceInProcess --disable-features=TranslateUI --metrics-recording-only --enable-automation --password-store=basic --use-mock-keychain';
-        const timeoutInput = core.getInput('timeout') || '60';
+        const timeoutInput = core.getInput('timeout') || '120';
         const timeout = parseInt(timeoutInput);
         const throttlingMethod = core.getInput('throttling_method') || 'devtools';
         const cpuSlowdownMultiplierInput = core.getInput('cpu_slowdown_multiplier');
