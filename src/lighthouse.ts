@@ -21,19 +21,17 @@ async function runLighthouseForUrl(
     lighthouseConfig: string | undefined,
     cpuSlowdownMultiplier: number | undefined,
     disableCpuThrottling: boolean,
-    maxWaitForFcp: number,
     maxRetries: number = 2
 ): Promise<LighthouseResult> {
     core.info(`Running Lighthouse for URL: ${url}, Device: ${deviceType}`);
 
     const outputDir = path.resolve(process.cwd(), 'lighthouse-results');
-    const baseOutputName = `${encodeURIComponent(url.replace(/[^a-zA-Z0-9]/g, '_'))}-${deviceType}`;
-    const outputPath = path.join(outputDir, baseOutputName);
+    const outputFile = path.join(outputDir, `${encodeURIComponent(url.replace(/[^a-zA-Z0-9]/g, '_'))}-${deviceType}.json`);
+    const htmlOutputFile = path.join(outputDir, `${encodeURIComponent(url.replace(/[^a-zA-Z0-9]/g, '_'))}-${deviceType}.html`);
 
     core.debug(`Output directory: ${outputDir}`);
-    core.debug(`Base output path: ${outputPath}`);
-    core.debug(`Expected JSON output file: ${outputPath}.report.json`);
-    core.debug(`Expected HTML output file: ${outputPath}.report.html`);
+    core.debug(`JSON output file: ${outputFile}`);
+    core.debug(`HTML output file: ${htmlOutputFile}`);
 
     if (!fs.existsSync(outputDir)) {
         try {
@@ -61,7 +59,7 @@ async function runLighthouseForUrl(
 
     const effectiveThrottlingMethod = throttlingMethod;
     let cpuThrottlingArgs = '';
-    
+
     if (disableCpuThrottling) {
         cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=1';
         core.debug(`CPU throttling disabled for ${deviceType} (network throttling: ${throttlingMethod})`);
@@ -70,33 +68,36 @@ async function runLighthouseForUrl(
         core.debug(`Using custom CPU slowdown multiplier: ${cpuSlowdownMultiplier}x for ${deviceType}`);
     } else if (deviceType === 'desktop') {
         cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=1';
+    } else if (deviceType === 'mobile') {
+        cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=2';
+        core.debug('Using optimized mobile CPU slowdown: 2x (instead of default 4x) for better CI accuracy');
     }
-    
+
     const command = [
         'npx',
         'lighthouse@latest',
         `"${url.replace(/"/g, '\\"')}"`,
         '--output=json,html',
-        `--output-path=${outputPath}`,
+        `--output-path=${outputFile}`,
         deviceType === 'desktop' ? '--preset=desktop' : '',
         `--only-categories=${categoriesArg}`,
         `--chrome-flags="${sanitizedChromeFlags}"`,
         `--max-wait-for-load=${timeout * 1000}`,
-        `--max-wait-for-fcp=${maxWaitForFcp}`,
-        '--timeout=' + (timeout * 1000),
-        '--gather-mode=navigation',
-        deviceType === 'mobile' ? `--throttling-method=${effectiveThrottlingMethod}` : '--throttling-method=provided',
+        `--throttling-method=${effectiveThrottlingMethod}`,
         cpuThrottlingArgs,
         `--locale=${locale}`,
         '--screenEmulation.mobile=' + (deviceType === 'mobile' ? 'true' : 'false'),
-        '--screenEmulation.width=' + (deviceType === 'mobile' ? '360' : '1350'),
-        '--screenEmulation.height=' + (deviceType === 'mobile' ? '640' : '940'),
-        '--screenEmulation.deviceScaleFactor=' + (deviceType === 'mobile' ? '2' : '1'),
+        '--screenEmulation.width=' + (deviceType === 'mobile' ? '412' : '1350'),
+        '--screenEmulation.height=' + (deviceType === 'mobile' ? '823' : '940'),
+        '--screenEmulation.deviceScaleFactor=' + (deviceType === 'mobile' ? '1.75' : '1'),
         '--screenEmulation.disabled=false',
         deviceType === 'desktop' ? '--form-factor=desktop' : '--form-factor=mobile',
         deviceType === 'desktop' ? '--emulated-form-factor=desktop' : '--emulated-form-factor=mobile',
         '--quiet',
         '--no-enable-error-reporting',
+        '--disable-storage-reset',
+        '--disable-full-page-screenshot',
+        '--gather-mode=navigation',
         lighthouseConfig ? `--config-path="${lighthouseConfig}"` : ''
     ].filter(Boolean).join(' ');
 
@@ -128,34 +129,49 @@ async function runLighthouseForUrl(
             const files = fs.readdirSync(outputDir);
             core.debug(`Files in output directory: ${files.join(', ')}`);
 
-            const expectedJsonFile = `${baseOutputName}.report.json`;
-            const expectedHtmlFile = `${baseOutputName}.report.html`;
-            
-            const jsonFilePath = path.join(outputDir, expectedJsonFile);
-            const htmlFilePath = path.join(outputDir, expectedHtmlFile);
+            const baseOutputName = path.basename(outputFile, '.json');
+            const jsonPattern = new RegExp(`${baseOutputName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*\\.json$`);
 
-            if (!fs.existsSync(jsonFilePath)) {
-                core.error(`Expected JSON file not found: ${jsonFilePath}`);
-                core.debug(`Files in directory: ${fs.readdirSync(outputDir).join(', ')}`);
-                throw new Error(`JSON output file not found: ${expectedJsonFile} in ${outputDir}`);
+            const jsonFiles = fs.readdirSync(outputDir)
+                .filter(file => jsonPattern.test(file));
+
+            if (jsonFiles.length === 0) {
+                throw new Error(`No JSON output files found matching pattern in ${outputDir}`);
             }
 
-            core.debug(`Found JSON result file: ${jsonFilePath}`);
+            jsonFiles.sort((a, b) => {
+                return fs.statSync(path.join(outputDir, b)).mtime.getTime() -
+                    fs.statSync(path.join(outputDir, a)).mtime.getTime();
+            });
+
+            const newestJsonFile = path.join(outputDir, jsonFiles[0]);
+            core.debug(`Found JSON result file: ${newestJsonFile}`);
 
             try {
-                const rawResults = fs.readFileSync(jsonFilePath, 'utf8');
+                const rawResults = fs.readFileSync(newestJsonFile, 'utf8');
                 core.debug(`Raw results file content (first 200 chars): ${rawResults.substring(0, 200)}...`);
 
                 const results = JSON.parse(rawResults);
 
                 if (!results.categories) {
-                    throw new Error(`Invalid Lighthouse results: missing 'categories' property`);
+                    throw new Error('Invalid Lighthouse results: missing \'categories\' property');
                 }
 
+                const htmlPattern = new RegExp(`${baseOutputName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*\\.html$`);
+                const htmlFiles = fs.readdirSync(outputDir)
+                    .filter(file => htmlPattern.test(file));
+
                 let reportUrl = '';
-                if (fs.existsSync(htmlFilePath)) {
-                    core.debug(`Found HTML report file: ${htmlFilePath}`);
-                    reportUrl = htmlFilePath;
+                if (htmlFiles.length > 0) {
+                    htmlFiles.sort((a, b) => {
+                        return fs.statSync(path.join(outputDir, b)).mtime.getTime() -
+                            fs.statSync(path.join(outputDir, a)).mtime.getTime();
+                    });
+
+                    const newestHtmlFile = path.join(outputDir, htmlFiles[0]);
+                    core.debug(`Found HTML report file: ${newestHtmlFile}`);
+
+                    reportUrl = newestHtmlFile;
                 } else {
                     core.warning(`No HTML report found for ${url} on ${deviceType}`);
                 }
@@ -214,13 +230,13 @@ function averageLighthouseResults(results: LighthouseResult[]): LighthouseResult
     if (results.length === 0) {
         throw new Error('No results to average');
     }
-    
+
     if (results.length === 1) {
         return results[0];
     }
-    
+
     const categoryScores: Record<string, number[]> = {};
-    
+
     results.forEach(result => {
         result.categories.forEach(category => {
             if (!categoryScores[category.id]) {
@@ -229,14 +245,14 @@ function averageLighthouseResults(results: LighthouseResult[]): LighthouseResult
             categoryScores[category.id].push(category.score);
         });
     });
-    
+
     const averagedCategories: LighthouseCategory[] = [];
     for (const [id, scores] of Object.entries(categoryScores)) {
         const sorted = scores.sort((a, b) => a - b);
         const median = sorted.length % 2 === 0
             ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
             : sorted[Math.floor(sorted.length / 2)];
-        
+
         const firstResult = results[0].categories.find(c => c.id === id);
         if (firstResult) {
             averagedCategories.push({
@@ -246,7 +262,7 @@ function averageLighthouseResults(results: LighthouseResult[]): LighthouseResult
             });
         }
     }
-    
+
     return {
         url: results[0].url,
         deviceType: results[0].deviceType,
@@ -264,23 +280,32 @@ export async function runLighthouseTests(
     categories: string[],
     chromeFlags: string,
     timeout: number,
-    throttlingMethod: string = 'simulate',
+    throttlingMethod: string = 'devtools',
     locale: string = 'en-US',
     runsPerUrl: number = 1,
     lighthouseConfig?: string,
     cpuSlowdownMultiplier?: number,
     disableCpuThrottling: boolean = false,
-    desktopTimeout?: number,
-    maxWaitForFcp: number = 30000
+    warmupRuns: number = 1,
+    performancePreset: string = 'browser-match'
 ): Promise<LighthouseResult[]> {
     const results: LighthouseResult[] = [];
     const errors: Error[] = [];
 
     core.info(`Starting Lighthouse tests for ${urls.length} URLs on ${deviceTypes.length} device types`);
-    if (runsPerUrl > 1) {
-        core.info(`Will run ${runsPerUrl} tests per URL/device and average the results`);
+    core.info('📊 Performance Configuration:');
+    core.info(`  - Preset: ${performancePreset}`);
+    core.info(`  - Throttling method: ${throttlingMethod}`);
+
+    if (warmupRuns > 0) {
+        core.info(`  - Warmup runs: ${warmupRuns} (stabilizes performance metrics)`);
     }
 
+    if (runsPerUrl > 1) {
+        core.info(`  - Test runs per URL: ${runsPerUrl} (results will be averaged)`);
+    }
+
+    const testStartTime = Date.now();
     const sanitizedChromeFlags = chromeFlags.replace(/"/g, '\\"');
 
     const BATCH_SIZE = 3;
@@ -291,7 +316,31 @@ export async function runLighthouseTests(
         const batchPromises = urlBatch.flatMap(url =>
             deviceTypes.map(async (deviceType) => {
                 const runResults: LighthouseResult[] = [];
-                
+
+                if (warmupRuns > 0) {
+                    for (let warmup = 1; warmup <= warmupRuns; warmup++) {
+                        try {
+                            core.info(`🔥 Running warmup ${warmup}/${warmupRuns} for ${url} on ${deviceType}...`);
+                            await runLighthouseForUrl(
+                                url,
+                                deviceType,
+                                categories,
+                                sanitizedChromeFlags,
+                                timeout,
+                                throttlingMethod,
+                                locale,
+                                lighthouseConfig,
+                                cpuSlowdownMultiplier,
+                                disableCpuThrottling,
+                                0
+                            );
+                            core.debug(`Warmup ${warmup} completed successfully`);
+                        } catch (error) {
+                            core.debug(`Warmup ${warmup} failed (this is okay): ${error}`);
+                        }
+                    }
+                }
+
                 for (let run = 1; run <= runsPerUrl; run++) {
                     try {
                         if (runsPerUrl > 1) {
@@ -299,25 +348,22 @@ export async function runLighthouseTests(
                         } else {
                             core.info(`Testing ${url} on ${deviceType}...`);
                         }
-                        
-                        const effectiveTimeout = (deviceType === 'desktop' && desktopTimeout) ? desktopTimeout : timeout;
-                        
+
                         const result = await runLighthouseForUrl(
-                            url, 
-                            deviceType, 
-                            categories, 
-                            sanitizedChromeFlags, 
-                            effectiveTimeout,
+                            url,
+                            deviceType,
+                            categories,
+                            sanitizedChromeFlags,
+                            timeout,
                             throttlingMethod,
                             locale,
                             lighthouseConfig,
                             cpuSlowdownMultiplier,
                             disableCpuThrottling,
-                            maxWaitForFcp,
                             2
                         );
                         runResults.push(result);
-                        
+
                         if (runsPerUrl > 1) {
                             core.info(`✅ Completed run ${run}/${runsPerUrl} for ${url} on ${deviceType}`);
                         }
@@ -330,7 +376,7 @@ export async function runLighthouseTests(
                         }
                     }
                 }
-                
+
                 if (runResults.length > 0) {
                     const averagedResult = averageLighthouseResults(runResults);
                     results.push(averagedResult);
@@ -345,7 +391,30 @@ export async function runLighthouseTests(
         await Promise.all(batchPromises);
     }
 
+    const testEndTime = Date.now();
+    const totalTestTime = (testEndTime - testStartTime) / 1000;
+
     core.info(`Completed Lighthouse tests: ${results.length} successful, ${errors.length} failed`);
+
+    core.info('📊 Performance Metrics Summary:');
+    core.info(`  - Total test time: ${totalTestTime.toFixed(1)}s`);
+    core.info(`  - Average time per URL: ${(totalTestTime / (urls.length * deviceTypes.length)).toFixed(1)}s`);
+
+    if (results.length > 0 && runsPerUrl > 1) {
+        const performanceScores = results
+            .filter(r => r.categories.find(c => c.id === 'performance'))
+            .map(r => r.categories.find(c => c.id === 'performance')?.score || 0);
+
+        if (performanceScores.length > 0) {
+            const avgScore = performanceScores.reduce((a, b) => a + b, 0) / performanceScores.length;
+            const minScore = Math.min(...performanceScores);
+            const maxScore = Math.max(...performanceScores);
+            const variance = maxScore - minScore;
+
+            core.info(`  - Average performance score: ${Math.round(avgScore * 100)}%`);
+            core.info(`  - Score variance: ${Math.round(variance * 100)}% ${variance < 0.1 ? '✅' : '⚠️'}`);
+        }
+    }
 
     if (results.length === 0) {
         if (errors.length > 0) {

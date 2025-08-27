@@ -37,7 +37,7 @@ inputs:
   chrome_flags:
     description: 'Custom Chrome flags for Lighthouse'
     required: false
-    default: '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --disable-extensions --no-first-run --disable-background-networking'
+    default: '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --disable-extensions --no-first-run --disable-background-networking --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --force-color-profile=srgb --enable-features=NetworkService,NetworkServiceInProcess --disable-features=TranslateUI --metrics-recording-only --enable-automation --password-store=basic --use-mock-keychain'
   timeout:
     description: 'Timeout for each test in seconds'
     required: false
@@ -57,7 +57,7 @@ inputs:
   throttling_method:
     description: 'Throttling method (simulate, devtools, or provided). Use "provided" to disable throttling'
     required: false
-    default: 'simulate'
+    default: 'devtools'
   cpu_slowdown_multiplier:
     description: 'CPU slowdown multiplier for mobile tests (e.g., 2 for 2x slowdown, 1 for no slowdown). Default is 4 for mobile.'
     required: false
@@ -77,6 +77,18 @@ inputs:
   lighthouse_config:
     description: 'Path to lighthouserc.json config file'
     required: false
+  warmup_runs:
+    description: 'Number of warmup runs before actual testing (helps with cold start issues)'
+    required: false
+    default: '1'
+  chrome_launch_timeout:
+    description: 'Chrome browser launch timeout in milliseconds'
+    required: false
+    default: '30000'
+  performance_preset:
+    description: 'Performance testing preset: browser-match (default), ci-optimized, legacy'
+    required: false
+    default: 'browser-match'
 
 runs:
   using: "composite"
@@ -84,7 +96,7 @@ runs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
 
     - name: Install dependencies
       run: npm ci
@@ -128,6 +140,9 @@ runs:
         INPUT_LOCALE: ${{ inputs.locale }}
         INPUT_RUNS_PER_URL: ${{ inputs.runs_per_url }}
         INPUT_LIGHTHOUSE_CONFIG: ${{ inputs.lighthouse_config }}
+        INPUT_WARMUP_RUNS: ${{ inputs.warmup_runs }}
+        INPUT_CHROME_LAUNCH_TIMEOUT: ${{ inputs.chrome_launch_timeout }}
+        INPUT_PERFORMANCE_PRESET: ${{ inputs.performance_preset }}
 
     - name: Check for Lighthouse reports
       run: |

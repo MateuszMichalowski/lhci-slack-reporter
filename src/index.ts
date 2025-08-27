@@ -24,14 +24,10 @@ async function run(): Promise<void> {
         const slackTitle = core.getInput('slack_title') || 'Lighthouse Test Results';
         const failOnScoreBelowInput = core.getInput('fail_on_score_below') || '0';
         const failOnScoreBelow = parseInt(failOnScoreBelowInput) / 100;
-        const chromeFlags = core.getInput('chrome_flags') || '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --disable-extensions --no-first-run --disable-background-networking';
+        const chromeFlags = core.getInput('chrome_flags') || '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --disable-extensions --no-first-run --disable-background-networking --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --force-color-profile=srgb --enable-features=NetworkService,NetworkServiceInProcess --disable-features=TranslateUI --metrics-recording-only --enable-automation --password-store=basic --use-mock-keychain';
         const timeoutInput = core.getInput('timeout') || '120';
         const timeout = parseInt(timeoutInput);
-        const desktopTimeoutInput = core.getInput('desktop_timeout');
-        const desktopTimeout = desktopTimeoutInput ? parseInt(desktopTimeoutInput) : timeout;
-        const maxWaitForFcpInput = core.getInput('max_wait_for_fcp') || '30000';
-        const maxWaitForFcp = parseInt(maxWaitForFcpInput);
-        const throttlingMethod = core.getInput('throttling_method') || 'simulate';
+        const throttlingMethod = core.getInput('throttling_method') || 'devtools';
         const cpuSlowdownMultiplierInput = core.getInput('cpu_slowdown_multiplier');
         const cpuSlowdownMultiplier = cpuSlowdownMultiplierInput ? parseFloat(cpuSlowdownMultiplierInput) : undefined;
         const disableCpuThrottling = core.getInput('disable_cpu_throttling') === 'true';
@@ -39,21 +35,27 @@ async function run(): Promise<void> {
         const runsPerUrlInput = core.getInput('runs_per_url') || '1';
         const runsPerUrl = parseInt(runsPerUrlInput);
         const lighthouseConfig = core.getInput('lighthouse_config');
+        const warmupRunsInput = core.getInput('warmup_runs') || '1';
+        const warmupRuns = parseInt(warmupRunsInput);
+        const performancePreset = core.getInput('performance_preset') || 'browser-match';
 
-        core.info(`📋 Configuration:`);
+        core.info('📋 Configuration:');
         core.info(`  - URLs: ${urls.join(', ')}`);
         core.info(`  - Device types: ${deviceTypes.join(', ')}`);
         core.info(`  - Test categories: ${categories.join(', ')}`);
         core.info(`  - Fail on score below: ${failOnScoreBelow * 100}%`);
-        core.info(`  - Timeout: ${timeout}s (Desktop: ${desktopTimeout}s)`);
         core.info(`  - Throttling method: ${throttlingMethod}`);
         if (disableCpuThrottling) {
-            core.info(`  - CPU throttling: DISABLED (for slow CI runners)`);
+            core.info('  - CPU throttling: DISABLED (for slow CI runners)');
         } else if (cpuSlowdownMultiplier !== undefined) {
             core.info(`  - CPU slowdown multiplier: ${cpuSlowdownMultiplier}x`);
         }
         core.info(`  - Locale: ${locale}`);
         core.info(`  - Runs per URL: ${runsPerUrl}`);
+        if (warmupRuns > 0) {
+            core.info(`  - Warmup runs: ${warmupRuns}`);
+        }
+        core.info(`  - Performance preset: ${performancePreset}`);
         if (lighthouseConfig) {
             core.info(`  - Config file: ${lighthouseConfig}`);
         }
@@ -94,8 +96,8 @@ async function run(): Promise<void> {
                     lighthouseConfig,
                     cpuSlowdownMultiplier,
                     disableCpuThrottling,
-                    desktopTimeout,
-                    maxWaitForFcp
+                    warmupRuns,
+                    performancePreset
                 );
             }
 

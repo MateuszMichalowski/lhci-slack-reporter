@@ -51,8 +51,12 @@ interface CategoryData {
  * Get emoji for a Lighthouse score using Unicode emoji
  */
 function getScoreEmoji(score: number): string {
-    if (score >= 0.9) return '🟢';
-    if (score >= 0.5) return '🟡';
+    if (score >= 0.9) {
+        return '🟢';
+    }
+    if (score >= 0.5) {
+        return '🟡';
+    }
     return '🔴';
 }
 
@@ -87,7 +91,9 @@ function getCategoryConfig(categoryName: string): CategoryData {
  * Normalize category name for consistent handling
  */
 function getNormalizedCategoryName(name: string): string {
-    if (!name) return 'unknown';
+    if (!name) {
+        return 'unknown';
+    }
 
     name = name.toLowerCase().trim();
 
@@ -103,35 +109,39 @@ function getNormalizedCategoryName(name: string): string {
  * Uses fixed-width columns for better alignment
  */
 function generateCategoryHeaders(categories: string[], hasMobileTests = false, hasDesktopTests = false): string {
-    if (categories.length === 0) return "```| No categories tested |```";
+    if (categories.length === 0) {
+        return '```| No categories tested |```';
+    }
 
     const COLUMN_WIDTH = 13;
     const DEVICE_COLUMN_WIDTH = 5;
 
-    let header = "```| ";
+    let header = '```| ';
 
     categories.forEach(category => {
         const config = getCategoryConfig(category);
         const icon = config.icon;
         const paddingSize = Math.floor((COLUMN_WIDTH - icon.length) / 2);
-        const leftPad = " ".repeat(paddingSize);
-        const rightPad = " ".repeat(COLUMN_WIDTH - icon.length - paddingSize);
+        const leftPad = ' '.repeat(paddingSize);
+        const rightPad = ' '.repeat(COLUMN_WIDTH - icon.length - paddingSize);
         header += `${leftPad}${icon}${rightPad}|`;
     });
 
-    let deviceSummary = "";
+    let deviceSummary = '';
     if (hasMobileTests) {
-        deviceSummary += "📱";
+        deviceSummary += '📱';
     }
     if (hasDesktopTests) {
-        if (deviceSummary.length) deviceSummary += " ";
-        deviceSummary += "💻";
+        if (deviceSummary.length) {
+            deviceSummary += ' ';
+        }
+        deviceSummary += '💻';
     }
 
     const devicePaddingSize = Math.floor((DEVICE_COLUMN_WIDTH - deviceSummary.length) / 2);
-    header += ` ${" ".repeat(devicePaddingSize)}${deviceSummary}${" ".repeat(Math.max(0, DEVICE_COLUMN_WIDTH - deviceSummary.length - devicePaddingSize))}`;
+    header += ` ${' '.repeat(devicePaddingSize)}${deviceSummary}${' '.repeat(Math.max(0, DEVICE_COLUMN_WIDTH - deviceSummary.length - devicePaddingSize))}`;
 
-    return header + "```";
+    return header + '```';
 }
 
 /**
@@ -146,12 +156,14 @@ function formatScoreRow(
     urlText: string,
     summaryColumn: SummaryColumnSlot
 ): string {
-    if (categories.length === 0) return "```| No data available |```";
+    if (categories.length === 0) {
+        return '```| No data available |```';
+    }
 
     const COLUMN_WIDTH = 13;
     const DEVICE_COLUMN_WIDTH = 5;
 
-    let row = "```|";
+    let row = '```|';
 
     categories.forEach(category => {
         const mobileScore = mobileScores[category] || 0;
@@ -168,51 +180,51 @@ function formatScoreRow(
         } else if (hasDesktop) {
             scoreText = formatPercentage(desktopScore);
         } else {
-            scoreText = "N/A";
+            scoreText = 'N/A';
         }
 
         const paddingSize = Math.floor((COLUMN_WIDTH - scoreText.length) / 2);
-        const leftPad = " ".repeat(paddingSize);
-        const rightPad = " ".repeat(COLUMN_WIDTH - scoreText.length - paddingSize);
+        const leftPad = ' '.repeat(paddingSize);
+        const rightPad = ' '.repeat(COLUMN_WIDTH - scoreText.length - paddingSize);
 
         row += `${leftPad}${scoreText}${rightPad}|`;
     });
 
-    let summaryText = "";
+    let summaryText = '';
     if (summaryColumn.mobileScoreEmoji) {
         summaryText += summaryColumn.mobileScoreEmoji;
     }
     if (summaryColumn.desktopScoreEmoji) {
         if (summaryText.length) {
-            summaryText += "/";
+            summaryText += '/';
         }
         summaryText += summaryColumn.desktopScoreEmoji;
     }
 
     const summaryPaddingSize = Math.floor((DEVICE_COLUMN_WIDTH - summaryText.length) / 2);
-    row += ` ${" ".repeat(summaryPaddingSize)}${summaryText}${" ".repeat(Math.max(0, DEVICE_COLUMN_WIDTH - summaryText.length - summaryPaddingSize))}`;
+    row += ` ${' '.repeat(summaryPaddingSize)}${summaryText}${' '.repeat(Math.max(0, DEVICE_COLUMN_WIDTH - summaryText.length - summaryPaddingSize))}`;
 
-    return row + "\n" + urlText + "```";
+    return row + '\n' + urlText + '```';
 }
 
 /**
  * Generate legend explanation for the table
  */
 function generateLegend(categories: string[], hasMobile: boolean, hasDesktop: boolean): string {
-    let legend = "Legend: ";
+    let legend = 'Legend: ';
 
     const categoryLegends = categories.map(cat => {
         const config = getCategoryConfig(cat);
         return `${config.icon} - ${config.title}`;
     });
-    legend += categoryLegends.join(" • ");
+    legend += categoryLegends.join(' • ');
 
     if (hasMobile && hasDesktop) {
-        legend += "\n📊 Format: Mobile/Desktop scores";
+        legend += '\n📊 Format: Mobile/Desktop scores';
     } else if (hasMobile) {
-        legend += "\n📊 Showing Mobile scores";
+        legend += '\n📊 Showing Mobile scores';
     } else if (hasDesktop) {
-        legend += "\n📊 Showing Desktop scores";
+        legend += '\n📊 Showing Desktop scores';
     }
 
     return legend;
@@ -459,7 +471,7 @@ async function sendViaWebhook(
     channel?: string,
     timeoutMs: number = 10000
 ): Promise<void> {
-    core.debug(`Sending report to Slack webhook`);
+    core.debug('Sending report to Slack webhook');
 
     try {
         const webhook = new IncomingWebhook(webhookUrl);
@@ -505,7 +517,7 @@ async function sendViaApi(
     title?: string,
     timeoutMs: number = 10000
 ): Promise<void> {
-    core.debug(`Sending report to Slack API`);
+    core.debug('Sending report to Slack API');
 
     try {
         const client = new WebClient(token, {
