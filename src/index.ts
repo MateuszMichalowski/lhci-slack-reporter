@@ -37,7 +37,6 @@ async function run(): Promise<void> {
         const lighthouseConfig = core.getInput('lighthouse_config');
         const warmupRunsInput = core.getInput('warmup_runs') || '1';
         const warmupRuns = parseInt(warmupRunsInput);
-        const chromeLaunchTimeout = parseInt(core.getInput('chrome_launch_timeout') || '30000');
         const performancePreset = core.getInput('performance_preset') || 'browser-match';
 
         core.info('📋 Configuration:');
@@ -98,7 +97,6 @@ async function run(): Promise<void> {
                     cpuSlowdownMultiplier,
                     disableCpuThrottling,
                     warmupRuns,
-                    chromeLaunchTimeout,
                     performancePreset
                 );
             }
