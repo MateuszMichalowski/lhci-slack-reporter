@@ -182,7 +182,7 @@ export function validateInputs(): void {
     urls.forEach(url => {
         try {
             new URL(url);
-        } catch (error) {
+        } catch {
             throw new Error(`Invalid URL: ${url}`);
         }
     });
