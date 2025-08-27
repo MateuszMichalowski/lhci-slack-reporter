@@ -24,7 +24,7 @@ async function run(): Promise<void> {
         const slackTitle = core.getInput('slack_title') || 'Lighthouse Test Results';
         const failOnScoreBelowInput = core.getInput('fail_on_score_below') || '0';
         const failOnScoreBelow = parseInt(failOnScoreBelowInput) / 100;
-        const chromeFlags = core.getInput('chrome_flags') || '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --disable-extensions --no-first-run --disable-background-networking';
+        const chromeFlags = core.getInput('chrome_flags') || '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --disable-extensions --no-first-run --disable-background-networking --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling --disable-features=TranslateUI';
         const timeoutInput = core.getInput('timeout') || '60';
         const timeout = parseInt(timeoutInput);
         const throttlingMethod = core.getInput('throttling_method') || 'simulate';

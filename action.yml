@@ -37,7 +37,7 @@ inputs:
   chrome_flags:
     description: 'Custom Chrome flags for Lighthouse'
     required: false
-    default: '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --disable-extensions --no-first-run --disable-background-networking'
+    default: '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --disable-extensions --no-first-run --disable-background-networking --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling --disable-features=TranslateUI'
   timeout:
     description: 'Timeout for each test in seconds'
     required: false
@@ -63,7 +63,7 @@ inputs:
     required: false
     default: 'en-US'
   runs_per_url:
-    description: 'Number of test runs per URL (results will be averaged)'
+    description: 'Number of test runs per URL (results will be averaged using median). Use 3+ for more stable results in CI environments'
     required: false
     default: '1'
   lighthouse_config:

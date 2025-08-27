@@ -59,15 +59,29 @@ async function runLighthouseForUrl(
 
     const effectiveThrottlingMethod = throttlingMethod;
     let cpuThrottlingArgs = '';
+    let effectiveCpuMultiplier = deviceType === 'mobile' ? 4 : 1;
     
     if (disableCpuThrottling) {
         cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=1';
-        core.debug(`CPU throttling disabled for ${deviceType} (network throttling: ${throttlingMethod})`);
+        effectiveCpuMultiplier = 1;
+        core.info(`⚡ CPU throttling disabled for ${deviceType} (network throttling: ${throttlingMethod})`);
     } else if (cpuSlowdownMultiplier !== undefined) {
         cpuThrottlingArgs = `--throttling.cpuSlowdownMultiplier=${cpuSlowdownMultiplier}`;
-        core.debug(`Using custom CPU slowdown multiplier: ${cpuSlowdownMultiplier}x for ${deviceType}`);
+        effectiveCpuMultiplier = cpuSlowdownMultiplier;
+        core.info(`🔧 Using custom CPU slowdown multiplier: ${cpuSlowdownMultiplier}x for ${deviceType}`);
     } else if (deviceType === 'desktop') {
         cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=1';
+        effectiveCpuMultiplier = 1;
+    }
+    
+    core.info(`📊 Lighthouse configuration for ${deviceType}:`);
+    core.info(`  - CPU slowdown: ${effectiveCpuMultiplier}x`);
+    core.info(`  - Network throttling: ${deviceType === 'mobile' ? effectiveThrottlingMethod : 'none (desktop)'}`);
+    core.info(`  - Screen: ${deviceType === 'mobile' ? '360x640 @2x' : '1350x940 @1x'}`);
+    
+    if (process.env.CI || process.env.GITHUB_ACTIONS) {
+        core.info(`  - Environment: CI/GitHub Actions detected`);
+        core.info(`  - Chrome flags include anti-throttling settings for consistent CI performance`);
     }
     
     const command = [
@@ -80,7 +94,7 @@ async function runLighthouseForUrl(
         `--only-categories=${categoriesArg}`,
         `--chrome-flags="${sanitizedChromeFlags}"`,
         `--max-wait-for-load=${timeout * 1000}`,
-        deviceType === 'mobile' ? `--throttling-method=${effectiveThrottlingMethod}` : '--throttling-method=provided',
+        `--throttling-method=${deviceType === 'mobile' ? effectiveThrottlingMethod : 'provided'}`,
         cpuThrottlingArgs,
         `--locale=${locale}`,
         '--screenEmulation.mobile=' + (deviceType === 'mobile' ? 'true' : 'false'),
@@ -96,6 +110,13 @@ async function runLighthouseForUrl(
     ].filter(Boolean).join(' ');
 
     core.debug(`Executing command: ${command}`);
+    
+    try {
+        const { stdout: chromeVersion } = await execPromise('google-chrome --version || chromium --version || chrome --version || echo "Chrome version unknown"');
+        core.info(`🌐 Chrome version: ${chromeVersion.trim()}`);
+    } catch {
+        core.debug('Could not determine Chrome version');
+    }
 
     let lastError = null;
     let retryDelay = 3000;
