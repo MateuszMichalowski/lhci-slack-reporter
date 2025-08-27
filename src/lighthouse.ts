@@ -59,7 +59,8 @@ async function runLighthouseForUrl(
 
     const effectiveThrottlingMethod = throttlingMethod;
     let cpuThrottlingArgs = '';
-    let effectiveCpuMultiplier = deviceType === 'mobile' ? 4 : 1;
+    const defaultMobileCpuMultiplier = 2;
+    let effectiveCpuMultiplier = deviceType === 'mobile' ? defaultMobileCpuMultiplier : 1;
     
     if (disableCpuThrottling) {
         cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=1';
@@ -72,17 +73,15 @@ async function runLighthouseForUrl(
     } else if (deviceType === 'desktop') {
         cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=1';
         effectiveCpuMultiplier = 1;
+    } else if (deviceType === 'mobile' && effectiveCpuMultiplier !== 4) {
+        cpuThrottlingArgs = `--throttling.cpuSlowdownMultiplier=${effectiveCpuMultiplier}`;
     }
     
     core.info(`📊 Lighthouse configuration for ${deviceType}:`);
     core.info(`  - CPU slowdown: ${effectiveCpuMultiplier}x`);
     core.info(`  - Network throttling: ${deviceType === 'mobile' ? effectiveThrottlingMethod : 'none (desktop)'}`);
     core.info(`  - Screen: ${deviceType === 'mobile' ? '360x640 @2x' : '1350x940 @1x'}`);
-    
-    if (process.env.CI || process.env.GITHUB_ACTIONS) {
-        core.info(`  - Environment: CI/GitHub Actions detected`);
-        core.info(`  - Chrome flags include anti-throttling settings for consistent CI performance`);
-    }
+    core.info(`  - Chrome flags: Optimized for CI with anti-throttling settings`);
     
     const command = [
         'npx',

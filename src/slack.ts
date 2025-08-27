@@ -154,8 +154,10 @@ function formatScoreRow(
     let row = "```|";
 
     categories.forEach(category => {
-        const mobileScore = mobileScores[category] || 0;
-        const desktopScore = desktopScores[category] || 0;
+        const mobileScore = mobileScores[category] !== undefined ? mobileScores[category] : 0;
+        const desktopScore = desktopScores[category] !== undefined ? desktopScores[category] : 0;
+        
+        core.debug(`Formatting score for ${category}: mobile=${mobileScore}, desktop=${desktopScore}`);
 
         let scoreText;
 
@@ -272,6 +274,8 @@ function createSlackBlocks(
             const categoryName = getNormalizedCategoryName(rawCategoryName);
 
             allCategories.add(categoryName);
+            
+            core.debug(`URL: ${url}, Device: ${result.deviceType}, Category: ${categoryName}, Score: ${category.score}`);
 
             if (result.deviceType === 'mobile') {
                 hasMobileTests = true;
