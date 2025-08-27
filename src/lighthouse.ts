@@ -287,7 +287,6 @@ export async function runLighthouseTests(
     cpuSlowdownMultiplier?: number,
     disableCpuThrottling: boolean = false,
     warmupRuns: number = 1,
-    _chromeLaunchTimeout: number = 30000,
     performancePreset: string = 'browser-match'
 ): Promise<LighthouseResult[]> {
     const results: LighthouseResult[] = [];
