@@ -51,7 +51,7 @@ inputs:
     required: false
     default: 'simulate'
   cpu_slowdown_multiplier:
-    description: 'CPU slowdown multiplier for mobile tests (e.g., 2 for 2x slowdown, 1 for no slowdown). Default is 4 for mobile.'
+    description: 'CPU slowdown multiplier for mobile tests (e.g., 2 for 2x slowdown, 1 for no slowdown). Default is 2x for mobile to prevent double throttling in CI.'
     required: false
     default: ''
   disable_cpu_throttling:
