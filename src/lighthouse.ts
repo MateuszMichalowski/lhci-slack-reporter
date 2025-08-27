@@ -73,9 +73,11 @@ async function runLighthouseForUrl(
         core.debug('Using optimized mobile CPU slowdown: 2x (instead of default 4x) for better CI accuracy');
     }
 
+    // Use lighthouse directly if installed globally, otherwise use npx with specific version
     const command = [
         'npx',
-        'lighthouse@latest',
+        '--yes',  // Automatically install if not present
+        'lighthouse@12.8.1',  // Use specific version for consistency
         `"${url.replace(/"/g, '\\"')}"`,
         '--output=json,html',
         `--output-path=${outputFile}`,
@@ -101,7 +103,12 @@ async function runLighthouseForUrl(
         lighthouseConfig ? `--config-path="${lighthouseConfig}"` : ''
     ].filter(Boolean).join(' ');
 
-    core.debug(`Executing command: ${command}`);
+    // Log command parts for debugging
+    core.debug(`Executing Lighthouse with:`);
+    core.debug(`  URL: ${url}`);
+    core.debug(`  Device: ${deviceType}`);
+    core.debug(`  Output: ${outputFile}`);
+    core.debug(`Full command: ${command}`);
 
     let lastError = null;
     let retryDelay = 3000;
@@ -114,7 +121,10 @@ async function runLighthouseForUrl(
         }
 
         try {
-            const { stdout, stderr } = await execPromise(command);
+            const { stdout, stderr } = await execPromise(command, {
+                maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large outputs
+                timeout: (timeout + 30) * 1000 // Add 30 seconds to the lighthouse timeout
+            });
             core.debug(`Command stdout: ${stdout}`);
 
             if (stderr) {
