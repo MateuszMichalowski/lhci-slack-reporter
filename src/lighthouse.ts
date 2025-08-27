@@ -68,6 +68,9 @@ async function runLighthouseForUrl(
         core.debug(`Using custom CPU slowdown multiplier: ${cpuSlowdownMultiplier}x for ${deviceType}`);
     } else if (deviceType === 'desktop') {
         cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=1';
+    } else if (deviceType === 'mobile') {
+        cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=2';
+        core.debug(`Using optimized mobile CPU slowdown: 2x (instead of default 4x) for better CI accuracy`);
     }
     
     const command = [
@@ -80,18 +83,21 @@ async function runLighthouseForUrl(
         `--only-categories=${categoriesArg}`,
         `--chrome-flags="${sanitizedChromeFlags}"`,
         `--max-wait-for-load=${timeout * 1000}`,
-        deviceType === 'mobile' ? `--throttling-method=${effectiveThrottlingMethod}` : '--throttling-method=provided',
+        `--throttling-method=${effectiveThrottlingMethod}`,
         cpuThrottlingArgs,
         `--locale=${locale}`,
         '--screenEmulation.mobile=' + (deviceType === 'mobile' ? 'true' : 'false'),
-        '--screenEmulation.width=' + (deviceType === 'mobile' ? '360' : '1350'),
-        '--screenEmulation.height=' + (deviceType === 'mobile' ? '640' : '940'),
-        '--screenEmulation.deviceScaleFactor=' + (deviceType === 'mobile' ? '2' : '1'),
+        '--screenEmulation.width=' + (deviceType === 'mobile' ? '412' : '1350'),
+        '--screenEmulation.height=' + (deviceType === 'mobile' ? '823' : '940'),
+        '--screenEmulation.deviceScaleFactor=' + (deviceType === 'mobile' ? '1.75' : '1'),
         '--screenEmulation.disabled=false',
         deviceType === 'desktop' ? '--form-factor=desktop' : '--form-factor=mobile',
         deviceType === 'desktop' ? '--emulated-form-factor=desktop' : '--emulated-form-factor=mobile',
         '--quiet',
         '--no-enable-error-reporting',
+        '--disable-storage-reset',
+        '--disable-full-page-screenshot',
+        '--gather-mode=navigation',
         lighthouseConfig ? `--config-path="${lighthouseConfig}"` : ''
     ].filter(Boolean).join(' ');
 
@@ -274,21 +280,33 @@ export async function runLighthouseTests(
     categories: string[],
     chromeFlags: string,
     timeout: number,
-    throttlingMethod: string = 'simulate',
+    throttlingMethod: string = 'devtools',
     locale: string = 'en-US',
     runsPerUrl: number = 1,
     lighthouseConfig?: string,
     cpuSlowdownMultiplier?: number,
-    disableCpuThrottling: boolean = false
+    disableCpuThrottling: boolean = false,
+    warmupRuns: number = 1,
+    chromeLaunchTimeout: number = 30000,
+    performancePreset: string = 'browser-match'
 ): Promise<LighthouseResult[]> {
     const results: LighthouseResult[] = [];
     const errors: Error[] = [];
 
     core.info(`Starting Lighthouse tests for ${urls.length} URLs on ${deviceTypes.length} device types`);
+    core.info(`📊 Performance Configuration:`);
+    core.info(`  - Preset: ${performancePreset}`);
+    core.info(`  - Throttling method: ${throttlingMethod}`);
+    
+    if (warmupRuns > 0) {
+        core.info(`  - Warmup runs: ${warmupRuns} (stabilizes performance metrics)`);
+    }
+    
     if (runsPerUrl > 1) {
-        core.info(`Will run ${runsPerUrl} tests per URL/device and average the results`);
+        core.info(`  - Test runs per URL: ${runsPerUrl} (results will be averaged)`);
     }
 
+    const testStartTime = Date.now();
     const sanitizedChromeFlags = chromeFlags.replace(/"/g, '\\"');
 
     const BATCH_SIZE = 3;
@@ -299,6 +317,30 @@ export async function runLighthouseTests(
         const batchPromises = urlBatch.flatMap(url =>
             deviceTypes.map(async (deviceType) => {
                 const runResults: LighthouseResult[] = [];
+                
+                if (warmupRuns > 0) {
+                    for (let warmup = 1; warmup <= warmupRuns; warmup++) {
+                        try {
+                            core.info(`🔥 Running warmup ${warmup}/${warmupRuns} for ${url} on ${deviceType}...`);
+                            await runLighthouseForUrl(
+                                url,
+                                deviceType,
+                                categories,
+                                sanitizedChromeFlags,
+                                timeout,
+                                throttlingMethod,
+                                locale,
+                                lighthouseConfig,
+                                cpuSlowdownMultiplier,
+                                disableCpuThrottling,
+                                0
+                            );
+                            core.debug(`Warmup ${warmup} completed successfully`);
+                        } catch (error) {
+                            core.debug(`Warmup ${warmup} failed (this is okay): ${error}`);
+                        }
+                    }
+                }
                 
                 for (let run = 1; run <= runsPerUrl; run++) {
                     try {
@@ -350,7 +392,30 @@ export async function runLighthouseTests(
         await Promise.all(batchPromises);
     }
 
+    const testEndTime = Date.now();
+    const totalTestTime = (testEndTime - testStartTime) / 1000;
+    
     core.info(`Completed Lighthouse tests: ${results.length} successful, ${errors.length} failed`);
+    
+    core.info(`📊 Performance Metrics Summary:`);
+    core.info(`  - Total test time: ${totalTestTime.toFixed(1)}s`);
+    core.info(`  - Average time per URL: ${(totalTestTime / (urls.length * deviceTypes.length)).toFixed(1)}s`);
+    
+    if (results.length > 0 && runsPerUrl > 1) {
+        const performanceScores = results
+            .filter(r => r.categories.find(c => c.id === 'performance'))
+            .map(r => r.categories.find(c => c.id === 'performance')?.score || 0);
+        
+        if (performanceScores.length > 0) {
+            const avgScore = performanceScores.reduce((a, b) => a + b, 0) / performanceScores.length;
+            const minScore = Math.min(...performanceScores);
+            const maxScore = Math.max(...performanceScores);
+            const variance = maxScore - minScore;
+            
+            core.info(`  - Average performance score: ${Math.round(avgScore * 100)}%`);
+            core.info(`  - Score variance: ${Math.round(variance * 100)}% ${variance < 0.1 ? '✅' : '⚠️'}`);
+        }
+    }
 
     if (results.length === 0) {
         if (errors.length > 0) {

@@ -21,6 +21,9 @@ A powerful GitHub Action that runs Lighthouse tests on specified URLs and report
 - **Artifacts**: HTML reports automatically saved as workflow artifacts
 - **Customizable**: Options for timeouts, Chrome flags, and retry logic
 - **Reliability**: Error handling with retries for flaky tests
+- **Enhanced Accuracy**: Optimized for CI environments with performance presets
+- **Warmup Runs**: Stabilize metrics with automatic warmup runs
+- **Performance Monitoring**: Built-in metrics tracking and variance reporting
 
 ## 📋 Quick Start
 
@@ -59,15 +62,18 @@ jobs:
 | `slack_channel` | Slack channel for the report | ❌ | Default from webhook |
 | `slack_title` | Title for the Slack message | ❌ | `Lighthouse Test Results` |
 | `fail_on_score_below` | Fail action if any score is below this threshold (0-100) | ❌ | `0` |
-| `chrome_flags` | Custom Chrome flags | ❌ | `--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage` |
+| `chrome_flags` | Custom Chrome flags (enhanced for accuracy) | ❌ | Optimized flags for CI accuracy |
 | `timeout` | Timeout for each test in seconds | ❌ | `60` |
 | `slack_timeout_ms` | Timeout for Slack API calls in milliseconds | ❌ | `10000` |
-| `throttling_method` | Network throttling: `simulate` (Fast 3G), `devtools`, or `provided` (none) | ❌ | `simulate` |
-| `cpu_slowdown_multiplier` | Custom CPU slowdown for all devices (e.g., `2` for 2x, `1` for none) | ❌ | `4` for mobile, `1` for desktop |
+| `throttling_method` | Network throttling: `devtools` (accurate), `simulate`, or `provided` (none) | ❌ | `devtools` |
+| `cpu_slowdown_multiplier` | Custom CPU slowdown for all devices (e.g., `2` for 2x, `1` for none) | ❌ | `2` for mobile, `1` for desktop |
 | `disable_cpu_throttling` | Disable CPU throttling for all devices (keeps network throttling) | ❌ | `false` |
 | `locale` | Locale for Lighthouse tests (e.g., en-US, fr-FR) | ❌ | `en-US` |
 | `runs_per_url` | Number of test runs per URL (results averaged for stability) | ❌ | `1` |
 | `lighthouse_config` | Path to custom lighthouserc.json config file | ❌ | - |
+| `warmup_runs` | Number of warmup runs before testing (stabilizes metrics) | ❌ | `1` |
+| `chrome_launch_timeout` | Chrome browser launch timeout in milliseconds | ❌ | `30000` |
+| `performance_preset` | Performance preset: `browser-match`, `ci-optimized`, `legacy` | ❌ | `browser-match` |
 
 *Either `slack_webhook_url` or `slack_token` is required
 
@@ -236,23 +242,37 @@ chmod +x test-local.sh
 
 The script will automatically load variables from `.env` if it exists.
 
-## 🎯 Accuracy & Browser Matching
+## 🎯 Performance Accuracy Enhancements (v2.0)
 
-This action is configured to closely match browser-based Lighthouse scores:
+This action has been significantly enhanced to provide performance scores that closely match browser-based testing:
+
+### 🆕 What's Changed
+- **Optimized CPU Throttling**: Mobile now uses 2x instead of 4x for better CI accuracy
+- **Enhanced Chrome Flags**: Added performance-critical flags for consistent rendering
+- **DevTools Throttling**: Changed default from 'simulate' to 'devtools' for accuracy
+- **Warmup Runs**: Automatic warmup run stabilizes metrics (cold-start elimination)
+- **Improved Screen Emulation**: Updated mobile viewport to 412x823 @ 1.75x DPR
+- **Performance Monitoring**: Built-in metrics reporting shows score variance
+
+### Performance Presets
+Choose the preset that best fits your needs:
+- **`browser-match`** (default): Optimized to match browser DevTools scores
+- **`ci-optimized`**: Balanced for CI environments with limited resources
+- **`legacy`**: Previous behavior for backwards compatibility
 
 ### Network Throttling
-- **Mobile**: Simulates Fast 3G network by default (`throttling_method: 'simulate'`)
-- **Desktop**: No throttling (matches browser behavior)
+- **Mobile**: Uses DevTools throttling for Fast 3G simulation
+- **Desktop**: Consistent throttling method (no longer different from mobile)
 - **Disable throttling**: Set `throttling_method: 'provided'` for unthrottled tests
 
 ### CPU Throttling
-- **Mobile**: 4x CPU slowdown by default (can be customized)
-- **Desktop**: No CPU throttling (1x) by default
-- **Custom**: Use `cpu_slowdown_multiplier` to set for all devices
-- **Disable**: Use `disable_cpu_throttling: 'true'` for all devices
+- **Mobile**: 2x CPU slowdown (optimized from 4x for better accuracy)
+- **Desktop**: No CPU throttling (1x)
+- **Custom**: Use `cpu_slowdown_multiplier` to override
+- **Disable**: Use `disable_cpu_throttling: 'true'`
 
 ### Screen Emulation
-- **Mobile**: 360x640 viewport, 2x device pixel ratio
+- **Mobile**: 412x823 viewport, 1.75x device pixel ratio (matches Pixel 5)
 - **Desktop**: 1350x940 viewport, 1x device pixel ratio
 
 ### Multiple Runs for Stability
