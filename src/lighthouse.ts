@@ -55,11 +55,34 @@ async function runLighthouseForUrl(
 
     const categoriesArg = categories.join(',');
 
-    const sanitizedChromeFlags = chromeFlags.replace(/"/g, '\\"').replace(/;/g, '');
+    // Add additional performance-enhancing Chrome flags for CI
+    const additionalFlags = [
+        '--disable-blink-features=AutomationControlled', // Prevent automation detection overhead
+        '--disable-features=IsolateOrigins,site-per-process', // Reduce process overhead
+        '--disable-web-security', // Skip security checks in CI
+        '--aggressive-cache-discard', // Ensure fresh page loads
+        '--disable-features=BlinkGenPropertyTrees,ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,AcceptCHFrame', // Disable unnecessary features
+        '--enable-features=NetworkService,NetworkServiceInProcess', // Optimize network
+        '--force-color-profile=srgb', // Consistent color profile
+        '--metrics-recording-only', // Reduce overhead
+        '--disable-breakpad', // No crash reporting needed
+        '--disable-features=AudioServiceOutOfProcess', // Keep audio in-process
+        '--disable-client-side-phishing-detection', // Skip phishing detection
+        '--disable-component-update', // No component updates
+        '--disable-domain-reliability', // Skip domain reliability
+        '--disable-features=Translate', // No translation needed
+        '--disable-hang-monitor', // No hang detection
+        '--disable-popup-blocking', // No popup blocking
+        '--disable-sync', // No sync needed
+        '--no-pings' // No pings
+    ].join(' ');
+    
+    const enhancedChromeFlags = `${chromeFlags} ${additionalFlags}`;
+    const sanitizedChromeFlags = enhancedChromeFlags.replace(/"/g, '\\"').replace(/;/g, '');
 
     const effectiveThrottlingMethod = throttlingMethod;
     let cpuThrottlingArgs = '';
-    const defaultMobileCpuMultiplier = 2;
+    const defaultMobileCpuMultiplier = 1.5;
     let effectiveCpuMultiplier = deviceType === 'mobile' ? defaultMobileCpuMultiplier : 1;
     
     if (disableCpuThrottling) {
@@ -73,7 +96,7 @@ async function runLighthouseForUrl(
     } else if (deviceType === 'desktop') {
         cpuThrottlingArgs = '--throttling.cpuSlowdownMultiplier=1';
         effectiveCpuMultiplier = 1;
-    } else if (deviceType === 'mobile' && effectiveCpuMultiplier !== 4) {
+    } else if (deviceType === 'mobile') {
         cpuThrottlingArgs = `--throttling.cpuSlowdownMultiplier=${effectiveCpuMultiplier}`;
     }
     
@@ -93,7 +116,7 @@ async function runLighthouseForUrl(
         `--only-categories=${categoriesArg}`,
         `--chrome-flags="${sanitizedChromeFlags}"`,
         `--max-wait-for-load=${timeout * 1000}`,
-        `--throttling-method=${deviceType === 'mobile' ? effectiveThrottlingMethod : 'provided'}`,
+        `--throttling-method=${throttlingMethod === 'provided' ? 'provided' : (deviceType === 'desktop' ? 'provided' : 'simulate')}`,
         cpuThrottlingArgs,
         `--locale=${locale}`,
         '--screenEmulation.mobile=' + (deviceType === 'mobile' ? 'true' : 'false'),

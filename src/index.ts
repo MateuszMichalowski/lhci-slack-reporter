@@ -34,7 +34,11 @@ async function run(): Promise<void> {
         const locale = core.getInput('locale') || 'en-US';
         const runsPerUrlInput = core.getInput('runs_per_url') || '1';
         const runsPerUrl = parseInt(runsPerUrlInput);
-        const lighthouseConfig = core.getInput('lighthouse_config');
+        let lighthouseConfig = core.getInput('lighthouse_config');
+        
+        if (lighthouseConfig === 'ci-optimized') {
+            lighthouseConfig = `${__dirname}/../lighthouse-ci.json`;
+        }
 
         core.info(`📋 Configuration:`);
         core.info(`  - URLs: ${urls.join(', ')}`);

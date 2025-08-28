@@ -51,11 +51,11 @@ inputs:
     required: false
     default: 'simulate'
   cpu_slowdown_multiplier:
-    description: 'CPU slowdown multiplier for mobile tests (e.g., 2 for 2x slowdown, 1 for no slowdown). Default is 2x for mobile to prevent double throttling in CI.'
+    description: 'CPU slowdown multiplier for mobile tests (e.g., 2 for 2x slowdown, 1 for no slowdown). Default is 1.5x for mobile to prevent double throttling in CI.'
     required: false
     default: ''
   disable_cpu_throttling:
-    description: 'Disable CPU throttling entirely (useful for slow CI runners)'
+    description: 'Disable CPU throttling entirely (useful for slow CI runners). Set to true for most accurate CI results.'
     required: false
     default: 'false'
   locale:
@@ -67,7 +67,7 @@ inputs:
     required: false
     default: '1'
   lighthouse_config:
-    description: 'Path to lighthouserc.json config file'
+    description: 'Path to lighthouserc.json config file. Use "ci-optimized" for built-in CI-optimized config'
     required: false
 
 runs:
