@@ -89,7 +89,7 @@ async function runLighthouseForUrl(
 
     const effectiveThrottlingMethod = throttlingMethod;
     let cpuThrottlingArgs = '';
-    const defaultMobileCpuMultiplier = 1.5;
+    const defaultMobileCpuMultiplier = 1;
     let effectiveCpuMultiplier = deviceType === 'mobile' ? defaultMobileCpuMultiplier : 1;
     
     if (disableCpuThrottling) {
@@ -143,7 +143,7 @@ async function runLighthouseForUrl(
             `--only-categories=${categoriesArg}`,
             `--chrome-flags="${sanitizedChromeFlags}"`,
             `--max-wait-for-load=${timeout * 1000}`,
-            `--throttling-method=${throttlingMethod === 'provided' ? 'provided' : 'simulate'}`,
+            `--throttling-method=${throttlingMethod === 'provided' ? 'provided' : 'devtools'}`,
             cpuThrottlingArgs,
             `--locale=${locale}`,
             '--screenEmulation.mobile=true',

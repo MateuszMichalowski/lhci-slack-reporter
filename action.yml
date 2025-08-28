@@ -47,11 +47,11 @@ inputs:
     required: false
     default: '10000'
   throttling_method:
-    description: 'Throttling method (simulate, devtools, or provided). Use "provided" to disable throttling'
+    description: 'Throttling method (simulate, devtools, or provided). Default is "devtools" for more accurate TBT. Use "provided" to disable throttling'
     required: false
-    default: 'simulate'
+    default: 'devtools'
   cpu_slowdown_multiplier:
-    description: 'CPU slowdown multiplier for mobile tests (e.g., 2 for 2x slowdown, 1 for no slowdown). Default is 1.5x for mobile to prevent double throttling in CI.'
+    description: 'CPU slowdown multiplier for mobile tests (e.g., 2 for 2x slowdown, 1 for no slowdown). Default is 1x (no throttling) to compensate for weak CI CPUs.'
     required: false
     default: ''
   disable_cpu_throttling:

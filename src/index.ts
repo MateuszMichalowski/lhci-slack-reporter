@@ -27,7 +27,7 @@ async function run(): Promise<void> {
         const chromeFlags = core.getInput('chrome_flags') || '--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage --disable-extensions --no-first-run --disable-background-networking --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling --disable-features=TranslateUI';
         const timeoutInput = core.getInput('timeout') || '60';
         const timeout = parseInt(timeoutInput);
-        const throttlingMethod = core.getInput('throttling_method') || 'simulate';
+        const throttlingMethod = core.getInput('throttling_method') || 'devtools';
         const cpuSlowdownMultiplierInput = core.getInput('cpu_slowdown_multiplier');
         const cpuSlowdownMultiplier = cpuSlowdownMultiplierInput ? parseFloat(cpuSlowdownMultiplierInput) : undefined;
         const disableCpuThrottling = core.getInput('disable_cpu_throttling') === 'true';
