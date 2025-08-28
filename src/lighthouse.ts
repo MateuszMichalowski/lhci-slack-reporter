@@ -76,9 +76,16 @@ async function runLighthouseForUrl(
         '--no-pings' // No pings
     ];
     
-    // Add desktop-specific flags
     if (deviceType === 'desktop') {
-        baseAdditionalFlags.push('--disable-features=BackForwardCache'); // Disable back/forward cache for desktop
+        baseAdditionalFlags.push('--disable-features=BackForwardCache');
+        baseAdditionalFlags.push('--disable-features=OptimizationGuideModelDownloading,OptimizationHintsFetching,OptimizationTargetPrediction,OptimizationHints');
+        baseAdditionalFlags.push('--disable-background-media-suspend');
+        baseAdditionalFlags.push('--disable-backgrounding-occluded-windows-new');
+        baseAdditionalFlags.push('--disable-renderer-priority-management');
+        baseAdditionalFlags.push('--disable-features=ScriptStreaming');
+        baseAdditionalFlags.push('--disable-image-animation-resync');
+        baseAdditionalFlags.push('--disable-new-content-rendering-timeout');
+        baseAdditionalFlags.push('--disable-setuid-sandbox');
     } else {
         baseAdditionalFlags.push('--metrics-recording-only'); // Only for mobile
     }
@@ -126,8 +133,11 @@ async function runLighthouseForUrl(
             `--only-categories=${categoriesArg}`,
             `--chrome-flags="${sanitizedChromeFlags}"`,
             `--max-wait-for-load=${timeout * 1000}`,
-            '--throttling-method=provided',  // Always use 'provided' for desktop (no throttling)
-            '--throttling.cpuSlowdownMultiplier=1',  // Explicitly set no CPU throttling
+            '--throttling-method=provided',
+            '--throttling.cpuSlowdownMultiplier=1',
+            '--throttling.requestLatencyMs=0',
+            '--throttling.downloadThroughputKbps=0',
+            '--throttling.uploadThroughputKbps=0',
             `--locale=${locale}`,
             '--quiet',
             '--no-enable-error-reporting',
