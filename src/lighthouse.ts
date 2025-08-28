@@ -56,7 +56,7 @@ async function runLighthouseForUrl(
     const categoriesArg = categories.join(',');
 
     // Add additional performance-enhancing Chrome flags for CI
-    const additionalFlags = [
+    const baseAdditionalFlags = [
         '--disable-blink-features=AutomationControlled', // Prevent automation detection overhead
         '--disable-features=IsolateOrigins,site-per-process', // Reduce process overhead
         '--disable-web-security', // Skip security checks in CI
@@ -64,7 +64,6 @@ async function runLighthouseForUrl(
         '--disable-features=BlinkGenPropertyTrees,ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,AcceptCHFrame', // Disable unnecessary features
         '--enable-features=NetworkService,NetworkServiceInProcess', // Optimize network
         '--force-color-profile=srgb', // Consistent color profile
-        '--metrics-recording-only', // Reduce overhead
         '--disable-breakpad', // No crash reporting needed
         '--disable-features=AudioServiceOutOfProcess', // Keep audio in-process
         '--disable-client-side-phishing-detection', // Skip phishing detection
@@ -75,8 +74,16 @@ async function runLighthouseForUrl(
         '--disable-popup-blocking', // No popup blocking
         '--disable-sync', // No sync needed
         '--no-pings' // No pings
-    ].join(' ');
+    ];
     
+    // Add desktop-specific flags
+    if (deviceType === 'desktop') {
+        baseAdditionalFlags.push('--disable-features=BackForwardCache'); // Disable back/forward cache for desktop
+    } else {
+        baseAdditionalFlags.push('--metrics-recording-only'); // Only for mobile
+    }
+    
+    const additionalFlags = baseAdditionalFlags.join(' ');
     const enhancedChromeFlags = `${chromeFlags} ${additionalFlags}`;
     const sanitizedChromeFlags = enhancedChromeFlags.replace(/"/g, '\\"').replace(/;/g, '');
 
@@ -106,30 +113,51 @@ async function runLighthouseForUrl(
     core.info(`  - Screen: ${deviceType === 'mobile' ? '360x640 @2x' : '1350x940 @1x'}`);
     core.info(`  - Chrome flags: Optimized for CI with anti-throttling settings`);
     
-    const command = [
-        'npx',
-        'lighthouse@latest',
-        `"${url.replace(/"/g, '\\"')}"`,
-        '--output=json,html',
-        `--output-path=${outputFile}`,
-        deviceType === 'desktop' ? '--preset=desktop' : '',
-        `--only-categories=${categoriesArg}`,
-        `--chrome-flags="${sanitizedChromeFlags}"`,
-        `--max-wait-for-load=${timeout * 1000}`,
-        `--throttling-method=${throttlingMethod === 'provided' ? 'provided' : (deviceType === 'desktop' ? 'provided' : 'simulate')}`,
-        cpuThrottlingArgs,
-        `--locale=${locale}`,
-        '--screenEmulation.mobile=' + (deviceType === 'mobile' ? 'true' : 'false'),
-        '--screenEmulation.width=' + (deviceType === 'mobile' ? '360' : '1350'),
-        '--screenEmulation.height=' + (deviceType === 'mobile' ? '640' : '940'),
-        '--screenEmulation.deviceScaleFactor=' + (deviceType === 'mobile' ? '2' : '1'),
-        '--screenEmulation.disabled=false',
-        deviceType === 'desktop' ? '--form-factor=desktop' : '--form-factor=mobile',
-        deviceType === 'desktop' ? '--emulated-form-factor=desktop' : '--emulated-form-factor=mobile',
-        '--quiet',
-        '--no-enable-error-reporting',
-        lighthouseConfig ? `--config-path="${lighthouseConfig}"` : ''
-    ].filter(Boolean).join(' ');
+    let command;
+    
+    if (deviceType === 'desktop') {
+        command = [
+            'npx',
+            'lighthouse@latest',
+            `"${url.replace(/"/g, '\\"')}"`,
+            '--output=json,html',
+            `--output-path=${outputFile}`,
+            '--preset=desktop',
+            `--only-categories=${categoriesArg}`,
+            `--chrome-flags="${sanitizedChromeFlags}"`,
+            `--max-wait-for-load=${timeout * 1000}`,
+            '--throttling-method=provided',  // Always use 'provided' for desktop (no throttling)
+            '--throttling.cpuSlowdownMultiplier=1',  // Explicitly set no CPU throttling
+            `--locale=${locale}`,
+            '--quiet',
+            '--no-enable-error-reporting',
+            lighthouseConfig ? `--config-path="${lighthouseConfig}"` : ''
+        ].filter(Boolean).join(' ');
+    } else {
+        command = [
+            'npx',
+            'lighthouse@latest',
+            `"${url.replace(/"/g, '\\"')}"`,
+            '--output=json,html',
+            `--output-path=${outputFile}`,
+            `--only-categories=${categoriesArg}`,
+            `--chrome-flags="${sanitizedChromeFlags}"`,
+            `--max-wait-for-load=${timeout * 1000}`,
+            `--throttling-method=${throttlingMethod === 'provided' ? 'provided' : 'simulate'}`,
+            cpuThrottlingArgs,
+            `--locale=${locale}`,
+            '--screenEmulation.mobile=true',
+            '--screenEmulation.width=360',
+            '--screenEmulation.height=640',
+            '--screenEmulation.deviceScaleFactor=2',
+            '--screenEmulation.disabled=false',
+            '--form-factor=mobile',
+            '--emulated-form-factor=mobile',
+            '--quiet',
+            '--no-enable-error-reporting',
+            lighthouseConfig ? `--config-path="${lighthouseConfig}"` : ''
+        ].filter(Boolean).join(' ');
+    }
 
     core.debug(`Executing command: ${command}`);
     
