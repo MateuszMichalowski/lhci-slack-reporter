@@ -1,0 +1,41 @@
+{
+  "extends": "lighthouse:default",
+  "settings": {
+    "onlyAudits": [
+      "first-contentful-paint",
+      "largest-contentful-paint",
+      "first-meaningful-paint",
+      "speed-index",
+      "total-blocking-time",
+      "cumulative-layout-shift",
+      "time-to-interactive",
+      "max-potential-fid",
+      "server-response-time",
+      "interactive"
+    ],
+    "skipAudits": [
+      "uses-http2",
+      "uses-long-cache-ttl",
+      "uses-text-compression",
+      "uses-optimized-images",
+      "uses-webp-images",
+      "uses-responsive-images"
+    ],
+    "throttling": {
+      "rttMs": 40,
+      "throughputKbps": 10240,
+      "cpuSlowdownMultiplier": 1,
+      "requestLatencyMs": 0,
+      "downloadThroughputKbps": 0,
+      "uploadThroughputKbps": 0
+    },
+    "formFactor": "mobile",
+    "screenEmulation": {
+      "mobile": true,
+      "width": 360,
+      "height": 640,
+      "deviceScaleFactor": 2,
+      "disabled": false
+    }
+  }
+}
