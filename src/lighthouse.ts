@@ -135,8 +135,7 @@ async function runLighthouseForUrl(
             `--max-wait-for-load=${timeout * 1000}`,
             `--locale=${locale}`,
             '--quiet',
-            '--no-enable-error-reporting',
-            lighthouseConfig ? `--config-path="${lighthouseConfig}"` : ''
+            '--no-enable-error-reporting'
         ].filter(Boolean).join(' ');
     } else {
         command = [
