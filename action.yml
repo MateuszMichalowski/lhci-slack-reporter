@@ -1,5 +1,5 @@
-name: 'Lighthouse CI Slack Reporter'
-description: 'Run Lighthouse tests on URLs and report results to Slack in tabular format'
+name: 'Lighthouse CI with PageSpeed Insights API Slack Reporter'
+description: 'Run Lighthouse or Page Speed Insights tests on URLs and report results to Slack in tabular format'
 author: 'MateuszMichalowski'
 branding:
   icon: 'bar-chart-2'
@@ -69,6 +69,17 @@ inputs:
   lighthouse_config:
     description: 'Path to lighthouserc.json config file. Use "ci-optimized" for built-in CI-optimized config'
     required: false
+  use_psi_api:
+    description: 'Use PageSpeed Insights API instead of local Lighthouse for more consistent results'
+    required: false
+    default: 'false'
+  psi_api_key:
+    description: 'Google PageSpeed Insights API key (required if use_psi_api is true)'
+    required: false
+  psi_strategy:
+    description: 'PSI testing strategy: "separate" tests desktop and mobile independently'
+    required: false
+    default: 'separate'
 
 runs:
   using: "composite"
@@ -118,6 +129,9 @@ runs:
         INPUT_LOCALE: ${{ inputs.locale }}
         INPUT_RUNS_PER_URL: ${{ inputs.runs_per_url }}
         INPUT_LIGHTHOUSE_CONFIG: ${{ inputs.lighthouse_config }}
+        INPUT_USE_PSI_API: ${{ inputs.use_psi_api }}
+        INPUT_PSI_API_KEY: ${{ inputs.psi_api_key }}
+        INPUT_PSI_STRATEGY: ${{ inputs.psi_strategy }}
 
     - name: Check for Lighthouse reports
       run: |

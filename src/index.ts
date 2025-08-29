@@ -1,8 +1,9 @@
 import * as glob from 'glob';
 import * as core from '@actions/core';
 import { runLighthouseTests } from './lighthouse';
+import { runPSITests, isPSIAvailable } from './psi';
 import { sendSlackReport } from './slack';
-import { parseInputArray, formatLighthouseResults, validateInputs } from './utils';
+import { parseInputArray, formatLighthouseResults, validateInputs, LighthouseResult } from './utils';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -39,6 +40,11 @@ async function run(): Promise<void> {
         if (lighthouseConfig === 'ci-optimized') {
             lighthouseConfig = `${__dirname}/../lighthouse-ci.json`;
         }
+        
+        // PSI API configuration
+        const usePsiApi = core.getInput('use_psi_api') === 'true';
+        const psiApiKey = core.getInput('psi_api_key');
+        const psiStrategy = core.getInput('psi_strategy') || 'separate';
 
         core.info(`📋 Configuration:`);
         core.info(`  - URLs: ${urls.join(', ')}`);
@@ -56,9 +62,13 @@ async function run(): Promise<void> {
         if (lighthouseConfig) {
             core.info(`  - Config file: ${lighthouseConfig}`);
         }
+        if (usePsiApi) {
+            core.info(`  - Using PageSpeed Insights API: YES`);
+            core.info(`  - PSI Strategy: ${psiStrategy}`);
+        }
 
-        core.info('🔍 Running Lighthouse tests...');
-        let lighthouseResults;
+        core.info('🔍 Running tests...');
+        let lighthouseResults: LighthouseResult[];
 
         try {
             if (fs.existsSync('lighthouse-results/example.json')) {
@@ -80,7 +90,37 @@ async function run(): Promise<void> {
                         reportUrl: 'lighthouse-results/example.html'
                     }
                 ];
+            } else if (usePsiApi && isPSIAvailable(psiApiKey)) {
+                core.info('🌐 Using PageSpeed Insights API for testing...');
+                core.info('This provides more consistent scores that match browser-based tests');
+                
+                try {
+                    lighthouseResults = await runPSITests(
+                        urls,
+                        deviceTypes,
+                        categories,
+                        psiApiKey!
+                    );
+                } catch (psiError) {
+                    core.warning(`PSI API failed: ${psiError}`);
+                    core.info('Falling back to local Lighthouse...');
+                    
+                    lighthouseResults = await runLighthouseTests(
+                        urls,
+                        deviceTypes,
+                        categories,
+                        chromeFlags,
+                        timeout,
+                        throttlingMethod,
+                        locale,
+                        runsPerUrl,
+                        lighthouseConfig,
+                        cpuSlowdownMultiplier,
+                        disableCpuThrottling
+                    );
+                }
             } else {
+                core.info('🔦 Using Lighthouse for testing...');
                 lighthouseResults = await runLighthouseTests(
                     urls,
                     deviceTypes,
