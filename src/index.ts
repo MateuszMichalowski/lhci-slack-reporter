@@ -99,7 +99,9 @@ async function run(): Promise<void> {
                         urls,
                         deviceTypes,
                         categories,
-                        psiApiKey!
+                        psiApiKey!,
+                        locale,
+                        runsPerUrl
                     );
                 } catch (psiError) {
                     core.warning(`PSI API failed: ${psiError}`);

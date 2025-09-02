@@ -59,9 +59,9 @@ inputs:
     required: false
     default: 'false'
   locale:
-    description: 'Locale for Lighthouse tests (e.g., en-US)'
+    description: 'Locale for Lighthouse and PSI tests. For EU sites use: en-GB, de-DE, fr-FR, es-ES, it-IT, nl-NL, pl-PL'
     required: false
-    default: 'en-US'
+    default: 'en-GB'
   runs_per_url:
     description: 'Number of test runs per URL (results will be averaged using median). Use 3+ for more stable results in CI environments'
     required: false

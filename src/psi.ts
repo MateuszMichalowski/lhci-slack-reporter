@@ -87,14 +87,19 @@ async function runPSITest(
     url: string,
     deviceType: string,
     categories: string[],
-    apiKey: string
+    apiKey: string,
+    locale: string = 'en-GB',
+    maxRetries: number = 3
 ): Promise<LighthouseResult> {
     core.info(`Running PSI test for URL: ${url}, Device: ${deviceType}`);
     
     const params = new URLSearchParams({
         url: url,
         strategy: deviceType === 'mobile' ? 'mobile' : 'desktop',
-        key: apiKey
+        key: apiKey,
+        locale: locale,
+        utm_source: 'lhci-github-action',
+        utm_campaign: 'automated-testing'
     });
     
     categories.forEach(category => {
@@ -103,40 +108,114 @@ async function runPSITest(
     
     const apiUrl = `${PSI_API_URL}?${params.toString()}`;
     
-    try {
-        core.debug(`Calling PSI API: ${apiUrl.replace(apiKey, 'REDACTED')}`);
-        
-        const response = await fetch(apiUrl, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json'
-            }
-        });
-        
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`PSI API error: ${response.status} - ${errorText}`);
+    let lastError: Error | null = null;
+    let retryDelay = 2000; // Start with 2 second delay
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        if (attempt > 0) {
+            core.info(`  Retry attempt ${attempt}/${maxRetries - 1} for ${url} on ${deviceType}`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            retryDelay = Math.min(retryDelay * 1.5, 10000); // Exponential backoff, max 10s
         }
         
-        const data = await response.json() as PSIResponse;
-        
-        const result: LighthouseResult = {
-            url: url,
-            deviceType: deviceType,
-            categories: extractCategories(data.lighthouseResult),
-            reportUrl: `https://pagespeed.web.dev/report?url=${encodeURIComponent(url)}`
-        };
-        
-        result.categories.forEach(cat => {
-            core.info(`  ${cat.title}: ${Math.round(cat.score * 100)}`);
-        });
-        
-        return result;
-        
-    } catch (error) {
-        core.error(`PSI test failed for ${url} on ${deviceType}: ${error}`);
-        throw error;
+        try {
+            core.debug(`Calling PSI API: ${apiUrl.replace(apiKey, 'REDACTED')}`);
+            
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                const error = new Error(`PSI API error: ${response.status} - ${errorText}`);
+                
+                if (response.status === 429 || response.status >= 500) {
+                    lastError = error;
+                    if (attempt < maxRetries - 1) {
+                        core.warning(`  API returned ${response.status}, will retry...`);
+                        continue;
+                    }
+                }
+                throw error;
+            }
+            
+            const data = await response.json() as PSIResponse;
+            
+            const result: LighthouseResult = {
+                url: url,
+                deviceType: deviceType,
+                categories: extractCategories(data.lighthouseResult),
+                reportUrl: `https://pagespeed.web.dev/report?url=${encodeURIComponent(url)}`
+            };
+            
+            result.categories.forEach(cat => {
+                core.info(`  ${cat.title}: ${Math.round(cat.score * 100)}`);
+            });
+            
+            return result;
+            
+        } catch (error) {
+            lastError = error instanceof Error ? error : new Error(String(error));
+            if (attempt === maxRetries - 1) {
+                core.error(`PSI test failed for ${url} on ${deviceType} after ${maxRetries} attempts: ${lastError.message}`);
+                throw lastError;
+            }
+        }
     }
+    
+    // This should never be reached, but TypeScript needs it
+    throw lastError || new Error(`Failed to run PSI test for ${url} on ${deviceType}`);
+}
+
+/**
+ * Average multiple PSI results for the same URL/device using median
+ */
+function averagePSIResults(results: LighthouseResult[]): LighthouseResult {
+    if (results.length === 0) {
+        throw new Error('No results to average');
+    }
+    
+    if (results.length === 1) {
+        return results[0];
+    }
+    
+    const categoryScores: Record<string, number[]> = {};
+    
+    results.forEach(result => {
+        result.categories.forEach(category => {
+            if (!categoryScores[category.id]) {
+                categoryScores[category.id] = [];
+            }
+            categoryScores[category.id].push(category.score);
+        });
+    });
+    
+    const averagedCategories: LighthouseCategory[] = [];
+    for (const [id, scores] of Object.entries(categoryScores)) {
+        const sorted = scores.sort((a, b) => a - b);
+        const median = sorted.length % 2 === 0
+            ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+            : sorted[Math.floor(sorted.length / 2)];
+        
+        const firstResult = results[0].categories.find(c => c.id === id);
+        if (firstResult) {
+            averagedCategories.push({
+                id,
+                title: firstResult.title,
+                score: median
+            });
+        }
+    }
+    
+    return {
+        url: results[0].url,
+        deviceType: results[0].deviceType,
+        categories: averagedCategories,
+        reportUrl: results[0].reportUrl
+    };
 }
 
 /**
@@ -146,13 +225,19 @@ export async function runPSITests(
     urls: string[],
     deviceTypes: string[],
     categories: string[],
-    apiKey: string
+    apiKey: string,
+    locale: string = 'en-GB',
+    runsPerUrl: number = 1
 ): Promise<LighthouseResult[]> {
     const results: LighthouseResult[] = [];
     const errors: Error[] = [];
     
     core.info(`Starting PSI tests for ${urls.length} URLs on ${deviceTypes.length} device types`);
     core.info(`Using PageSpeed Insights API for consistent, reliable scoring`);
+    core.info(`Configuration: Locale=${locale}, Runs per URL=${runsPerUrl}`);
+    if (runsPerUrl > 1) {
+        core.info(`Will run ${runsPerUrl} tests per URL/device and use median scores`);
+    }
     
     if (!apiKey) {
         throw new Error('PSI API key is required when use_psi_api is enabled');
@@ -160,26 +245,54 @@ export async function runPSITests(
     
     for (const url of urls) {
         for (const deviceType of deviceTypes) {
-            try {
-                core.info(`Testing ${url} on ${deviceType}...`);
-                
-                const result = await runPSITest(
-                    url,
-                    deviceType,
-                    categories,
-                    apiKey
-                );
-                
-                results.push(result);
-                core.info(`✅ Completed PSI test for ${url} on ${deviceType}`);
-                
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                core.warning(`Failed PSI test for ${url} on ${deviceType}: ${errorMessage}`);
-                errors.push(error instanceof Error ? error : new Error(String(error)));
+            const runResults: LighthouseResult[] = [];
+            
+            for (let run = 1; run <= runsPerUrl; run++) {
+                try {
+                    if (runsPerUrl > 1) {
+                        core.info(`Testing ${url} on ${deviceType} (run ${run}/${runsPerUrl})...`);
+                    } else {
+                        core.info(`Testing ${url} on ${deviceType}...`);
+                    }
+                    
+                    const result = await runPSITest(
+                        url,
+                        deviceType,
+                        categories,
+                        apiKey,
+                        locale,
+                        3 // max retries
+                    );
+                    
+                    runResults.push(result);
+                    
+                    if (runsPerUrl > 1 && run < runsPerUrl) {
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
+                    
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    core.warning(`Failed run ${run}/${runsPerUrl} for ${url} on ${deviceType}: ${errorMessage}`);
+                    
+                    if (run === runsPerUrl && runResults.length === 0) {
+                        errors.push(error instanceof Error ? error : new Error(String(error)));
+                    }
+                }
             }
+            
+            if (runResults.length > 0) {
+                const averagedResult = averagePSIResults(runResults);
+                results.push(averagedResult);
+                if (runsPerUrl > 1) {
+                    core.info(`✅ Completed PSI test for ${url} on ${deviceType} (averaged from ${runResults.length} successful runs)`);
+                } else {
+                    core.info(`✅ Completed PSI test for ${url} on ${deviceType}`);
+                }
+            } else {
+                core.error(`❌ All ${runsPerUrl} runs failed for ${url} on ${deviceType}`);
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
     }
     
