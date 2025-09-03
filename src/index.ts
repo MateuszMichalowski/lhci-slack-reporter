@@ -32,7 +32,7 @@ async function run(): Promise<void> {
         const cpuSlowdownMultiplierInput = core.getInput('cpu_slowdown_multiplier');
         const cpuSlowdownMultiplier = cpuSlowdownMultiplierInput ? parseFloat(cpuSlowdownMultiplierInput) : undefined;
         const disableCpuThrottling = core.getInput('disable_cpu_throttling') === 'true';
-        const locale = core.getInput('locale') || 'en-US';
+        const locale = core.getInput('locale') || 'en-GB';
         const runsPerUrlInput = core.getInput('runs_per_url') || '1';
         const runsPerUrl = parseInt(runsPerUrlInput);
         let lighthouseConfig = core.getInput('lighthouse_config');

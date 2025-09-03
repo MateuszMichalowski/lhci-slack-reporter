@@ -49,25 +49,25 @@ jobs:
 
 ## 🔧 Configuration Options
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `urls` | Comma-separated list of URLs to test | ✅ | - |
-| `device_types` | Device types to test (mobile, desktop) | ❌ | `mobile,desktop` |
-| `categories` | Categories to test (performance, accessibility, best-practices, seo) | ❌ | All categories |
-| `slack_webhook_url` | Slack Webhook URL | ✅* | - |
-| `slack_token` | Slack API token (alternative to webhook) | ✅* | - |
-| `slack_channel` | Slack channel for the report | ❌ | Default from webhook |
-| `slack_title` | Title for the Slack message | ❌ | `Lighthouse Test Results` |
-| `fail_on_score_below` | Fail action if any score is below this threshold (0-100) | ❌ | `0` |
+| Input | Description | Required | Default                                                             |
+|-------|-------------|----------|---------------------------------------------------------------------|
+| `urls` | Comma-separated list of URLs to test | ✅ | -                                                                   |
+| `device_types` | Device types to test (mobile, desktop) | ❌ | `mobile,desktop`                                                    |
+| `categories` | Categories to test (performance, accessibility, best-practices, seo) | ❌ | All categories                                                      |
+| `slack_webhook_url` | Slack Webhook URL | ✅* | -                                                                   |
+| `slack_token` | Slack API token (alternative to webhook) | ✅* | -                                                                   |
+| `slack_channel` | Slack channel for the report | ❌ | Default from webhook                                                |
+| `slack_title` | Title for the Slack message | ❌ | `Lighthouse Test Results`                                           |
+| `fail_on_score_below` | Fail action if any score is below this threshold (0-100) | ❌ | `0`                                                                 |
 | `chrome_flags` | Custom Chrome flags | ❌ | `--no-sandbox --headless=new --disable-gpu --disable-dev-shm-usage` |
-| `timeout` | Timeout for each test in seconds | ❌ | `60` |
-| `slack_timeout_ms` | Timeout for Slack API calls in milliseconds | ❌ | `10000` |
-| `throttling_method` | Network throttling: `simulate` (Fast 3G), `devtools`, or `provided` (none) | ❌ | `simulate` |
-| `cpu_slowdown_multiplier` | Custom CPU slowdown for all devices (e.g., `2` for 2x, `1` for none) | ❌ | `4` for mobile, `1` for desktop |
-| `disable_cpu_throttling` | Disable CPU throttling for all devices (keeps network throttling) | ❌ | `false` |
-| `locale` | Locale for Lighthouse tests (e.g., en-US, fr-FR) | ❌ | `en-US` |
-| `runs_per_url` | Number of test runs per URL (results averaged for stability) | ❌ | `1` |
-| `lighthouse_config` | Path to custom lighthouserc.json config file | ❌ | - |
+| `timeout` | Timeout for each test in seconds | ❌ | `60`                                                                |
+| `slack_timeout_ms` | Timeout for Slack API calls in milliseconds | ❌ | `10000`                                                             |
+| `throttling_method` | Network throttling: `simulate` (Fast 3G), `devtools`, or `provided` (none) | ❌ | `simulate`                                                          |
+| `cpu_slowdown_multiplier` | Custom CPU slowdown for all devices (e.g., `2` for 2x, `1` for none) | ❌ | `4` for mobile, `1` for desktop                                     |
+| `disable_cpu_throttling` | Disable CPU throttling for all devices (keeps network throttling) | ❌ | `false`                                                             |
+| `locale` | Locale for Lighthouse tests (e.g., en-US, fr-FR) | ❌ | `en-GB`                                                             |
+| `runs_per_url` | Number of test runs per URL (results averaged for stability) | ❌ | `1`                                                                 |
+| `lighthouse_config` | Path to custom lighthouserc.json config file | ❌ | -                                                                   |
 
 *Either `slack_webhook_url` or `slack_token` is required
 

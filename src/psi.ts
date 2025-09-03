@@ -1,4 +1,6 @@
 import * as core from '@actions/core';
+import * as fs from 'fs';
+import * as path from 'path';
 import { LighthouseResult, LighthouseCategory } from './utils';
 
 const PSI_API_URL = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
@@ -93,6 +95,17 @@ async function runPSITest(
 ): Promise<LighthouseResult> {
     core.info(`Running PSI test for URL: ${url}, Device: ${deviceType}`);
     
+    // Create output directory for PSI results
+    const outputDir = path.resolve(process.cwd(), 'lighthouse-results');
+    if (!fs.existsSync(outputDir)) {
+        try {
+            fs.mkdirSync(outputDir, { recursive: true });
+            core.debug(`Created output directory: ${outputDir}`);
+        } catch (err) {
+            core.error(`Failed to create output directory: ${err}`);
+        }
+    }
+    
     const params = new URLSearchParams({
         url: url,
         strategy: deviceType === 'mobile' ? 'mobile' : 'desktop',
@@ -143,6 +156,15 @@ async function runPSITest(
             }
             
             const data = await response.json() as PSIResponse;
+            
+            // Save raw PSI response to file
+            const outputFile = path.join(outputDir, `psi-${encodeURIComponent(url.replace(/[^a-zA-Z0-9]/g, '_'))}-${deviceType}.json`);
+            try {
+                fs.writeFileSync(outputFile, JSON.stringify(data, null, 2));
+                core.info(`  Saved PSI results to: ${outputFile}`);
+            } catch (err) {
+                core.warning(`Failed to save PSI results to file: ${err}`);
+            }
             
             const result: LighthouseResult = {
                 url: url,
@@ -283,7 +305,25 @@ export async function runPSITests(
             if (runResults.length > 0) {
                 const averagedResult = averagePSIResults(runResults);
                 results.push(averagedResult);
+                
+                // Save averaged results to file if multiple runs
                 if (runsPerUrl > 1) {
+                    const outputDir = path.resolve(process.cwd(), 'lighthouse-results');
+                    const avgOutputFile = path.join(outputDir, `psi-averaged-${encodeURIComponent(url.replace(/[^a-zA-Z0-9]/g, '_'))}-${deviceType}.json`);
+                    try {
+                        const avgData = {
+                            url: url,
+                            deviceType: deviceType,
+                            runsCompleted: runResults.length,
+                            totalRuns: runsPerUrl,
+                            averagedScores: averagedResult.categories,
+                            individualRuns: runResults.map(r => r.categories)
+                        };
+                        fs.writeFileSync(avgOutputFile, JSON.stringify(avgData, null, 2));
+                        core.info(`  Saved averaged PSI results to: ${avgOutputFile}`);
+                    } catch (err) {
+                        core.warning(`Failed to save averaged PSI results: ${err}`);
+                    }
                     core.info(`✅ Completed PSI test for ${url} on ${deviceType} (averaged from ${runResults.length} successful runs)`);
                 } else {
                     core.info(`✅ Completed PSI test for ${url} on ${deviceType}`);
