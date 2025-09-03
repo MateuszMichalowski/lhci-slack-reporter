@@ -362,7 +362,7 @@ export async function runLighthouseTests(
     chromeFlags: string,
     timeout: number,
     throttlingMethod: string = 'simulate',
-    locale: string = 'en-US',
+    locale: string = 'en-GB',
     runsPerUrl: number = 1,
     lighthouseConfig?: string,
     cpuSlowdownMultiplier?: number,
